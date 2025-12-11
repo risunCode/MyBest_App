@@ -15,20 +15,21 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.risuncode.mybest.R
 import com.risuncode.mybest.data.AppDatabase
+import com.risuncode.mybest.data.api.AttendanceRecord
+import com.risuncode.mybest.data.api.SessionExpiredException
 import com.risuncode.mybest.data.entity.ScheduleEntity
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.ActivityPresensiBinding
 import com.risuncode.mybest.ui.login.LoginActivity
 import com.risuncode.mybest.ui.tugas.TugasActivity
+import com.risuncode.mybest.util.PreferenceManager
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 class PresensiActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityPresensiBinding
     private lateinit var repository: AppRepository
+    private lateinit var prefManager: PreferenceManager
     private var scheduleId: Int = -1
     private var schedule: ScheduleEntity? = null
 
@@ -50,6 +51,7 @@ class PresensiActivity : AppCompatActivity() {
 
         val database = AppDatabase.getDatabase(this)
         repository = AppRepository(database)
+        prefManager = PreferenceManager(this)
 
         scheduleId = intent.getIntExtra(EXTRA_SCHEDULE_ID, -1)
 
@@ -65,7 +67,7 @@ class PresensiActivity : AppCompatActivity() {
     private fun setupListeners() {
         binding.btnTugas.setOnClickListener {
             schedule?.let { s ->
-                TugasActivity.start(this, s.id, s.subjectName)
+                TugasActivity.start(this, s.id, s.subjectName, s.encryptedId)
             }
         }
 
@@ -93,8 +95,8 @@ class PresensiActivity : AppCompatActivity() {
                     binding.btnPresensi.isEnabled = false
                 }
 
-                // Load attendance stats
-                loadAttendanceStats()
+                // Load attendance records from API or local
+                loadAttendanceRecords(s.encryptedId)
             }
         }
     }
@@ -102,59 +104,126 @@ class PresensiActivity : AppCompatActivity() {
     private var hadirCount = 0
     private var tidakHadirCount = 0
 
-    // Dummy data for attendance details
-    private data class AttendanceRecord(
-        val ptm: Int,
-        val date: String,
-        val isHadir: Boolean,
-        val rangkuman: String,
-        val beritaAcara: String
-    )
+    private fun loadAttendanceRecords(encryptedId: String) {
+        if (encryptedId.isEmpty()) {
+            // No encrypted ID - use dummy data
+            generateDummyAttendanceList()
+            return
+        }
+        
+        lifecycleScope.launch {
+            val result = repository.getAttendanceRecords(encryptedId)
+            
+            result.onSuccess { records ->
+                if (records.isNotEmpty()) {
+                    populateAttendanceList(records)
+                } else {
+                    generateDummyAttendanceList()
+                }
+            }.onFailure { error ->
+                if (error is SessionExpiredException) {
+                    handleSessionExpired()
+                } else {
+                    Toast.makeText(
+                        this@PresensiActivity,
+                        "Gagal memuat data presensi",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    generateDummyAttendanceList()
+                }
+            }
+        }
+    }
+    
+    private fun populateAttendanceList(records: List<AttendanceRecord>) {
+        val container = binding.attendanceListContainer
+        container.removeAllViews()
+        
+        hadirCount = records.count { it.status.contains("Hadir", ignoreCase = true) }
+        tidakHadirCount = records.count { !it.status.contains("Hadir", ignoreCase = true) }
+        
+        for (record in records) {
+            val itemView = LayoutInflater.from(this)
+                .inflate(R.layout.item_attendance_expandable, container, false)
 
-    private fun loadAttendanceStats() {
-        generateAttendanceList()
+            val tvNumber = itemView.findViewById<TextView>(R.id.tvNumber)
+            val tvStatus = itemView.findViewById<TextView>(R.id.tvStatus)
+            val tvDate = itemView.findViewById<TextView>(R.id.tvDate)
+            val tvPtm = itemView.findViewById<TextView>(R.id.tvPtm)
+            val ivExpand = itemView.findViewById<ImageView>(R.id.ivExpand)
+            val rowMain = itemView.findViewById<LinearLayout>(R.id.rowMain)
+            val expandableContent = itemView.findViewById<LinearLayout>(R.id.expandableContent)
+            val tvRangkuman = itemView.findViewById<TextView>(R.id.tvRangkuman)
+            val tvBeritaAcara = itemView.findViewById<TextView>(R.id.tvBeritaAcara)
+
+            tvNumber.text = record.no.toString()
+            tvDate.text = record.date
+            tvPtm.text = record.pertemuan
+            tvRangkuman.text = record.rangkuman.ifEmpty { "Tidak ada rangkuman" }
+            tvBeritaAcara.text = record.beritaAcara.ifEmpty { "Tidak ada berita acara" }
+
+            // Set status badge
+            val isHadir = record.status.contains("Hadir", ignoreCase = true)
+            if (isHadir) {
+                tvStatus.text = getString(R.string.status_hadir)
+                tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(this, R.color.status_success)
+                )
+            } else {
+                tvStatus.text = getString(R.string.status_tidak_hadir)
+                tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                    ContextCompat.getColor(this, R.color.status_error)
+                )
+            }
+
+            // Toggle expand/collapse with smooth animation
+            rowMain.setOnClickListener {
+                toggleExpand(expandableContent, ivExpand)
+            }
+
+            container.addView(itemView)
+        }
+        
         updateAttendanceUI()
     }
 
-    private fun generateAttendanceList() {
+    private fun generateDummyAttendanceList() {
         val container = binding.attendanceListContainer
         container.removeAllViews()
 
-        // Generate dummy attendance data (in real app, this comes from API)
-        val calendar = Calendar.getInstance()
-        val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
-        
+        data class DummyRecord(
+            val ptm: Int,
+            val date: String,
+            val isHadir: Boolean,
+            val rangkuman: String,
+            val beritaAcara: String
+        )
+
         val dummyRecords = listOf(
-            AttendanceRecord(1, "2025-09-22", true, 
+            DummyRecord(1, "2025-09-22", true, 
                 "Pengantar Keamanan dan Penjaminan Informasi",
-                "Membahas tentang Konsep dan prinsip dasar informasi\n• Mempelajari dasar-dasar bidang keamanan.\n• Mempelajari tentang Informasi keamanan dan komponen keamanan informasi dan aspek keamanan\n• Mempelajari tentang Prinsip Manajemen Keamanan Informasi dan Istilah keamanan"),
-            AttendanceRecord(2, "2025-09-29", true,
+                "Membahas tentang Konsep dan prinsip dasar informasi"),
+            DummyRecord(2, "2025-09-29", true,
                 "Ancaman dan Serangan Keamanan Informasi",
-                "• Mempelajari berbagai jenis ancaman keamanan\n• Memahami metode serangan cyber\n• Mengenal teknik pencegahan dasar"),
-            AttendanceRecord(3, "2025-10-06", true,
+                "Mempelajari berbagai jenis ancaman keamanan"),
+            DummyRecord(3, "2025-10-06", true,
                 "Kriptografi Dasar",
-                "• Pengenalan kriptografi\n• Algoritma enkripsi simetris dan asimetris\n• Implementasi keamanan data"),
-            AttendanceRecord(4, "2025-10-13", true,
+                "Pengenalan kriptografi dan algoritma enkripsi"),
+            DummyRecord(4, "2025-10-13", true,
                 "Keamanan Jaringan",
-                "• Arsitektur keamanan jaringan\n• Firewall dan IDS/IPS\n• VPN dan tunneling"),
-            AttendanceRecord(5, "2025-10-20", false,
+                "Arsitektur keamanan jaringan dan Firewall"),
+            DummyRecord(5, "2025-10-20", false,
                 "Manajemen Akses dan Identitas",
-                "• Autentikasi dan otorisasi\n• Single Sign-On (SSO)\n• Multi-factor authentication"),
-            AttendanceRecord(6, "2025-10-27", true,
+                "Autentikasi dan otorisasi"),
+            DummyRecord(6, "2025-10-27", true,
                 "Keamanan Aplikasi Web",
-                "• OWASP Top 10\n• SQL Injection dan XSS\n• Secure coding practices"),
-            AttendanceRecord(7, "2025-11-03", true,
+                "OWASP Top 10 dan SQL Injection"),
+            DummyRecord(7, "2025-11-03", true,
                 "Audit dan Compliance",
-                "• Standar keamanan (ISO 27001)\n• Audit keamanan informasi\n• Compliance requirements"),
-            AttendanceRecord(8, "2025-11-10", true,
+                "Standar keamanan ISO 27001"),
+            DummyRecord(8, "2025-11-10", true,
                 "Incident Response",
-                "• Proses penanganan insiden\n• Digital forensics dasar\n• Recovery planning"),
-            AttendanceRecord(9, "2025-11-17", true,
-                "Cloud Security",
-                "• Keamanan cloud computing\n• Shared responsibility model\n• Best practices cloud security"),
-            AttendanceRecord(10, "2025-11-24", true,
-                "Review dan Persiapan UAS",
-                "• Review materi keseluruhan\n• Latihan soal\n• Diskusi dan tanya jawab")
+                "Proses penanganan insiden")
         )
 
         hadirCount = dummyRecords.count { it.isHadir }
@@ -193,35 +262,40 @@ class PresensiActivity : AppCompatActivity() {
                 )
             }
 
-            // Toggle expand/collapse with smooth animation
             rowMain.setOnClickListener {
-                if (expandableContent.visibility == View.GONE) {
-                    expandableContent.visibility = View.VISIBLE
-                    expandableContent.alpha = 0f
-                    expandableContent.animate()
-                        .alpha(1f)
-                        .setDuration(250)
-                        .start()
-                    ivExpand.animate()
-                        .rotation(180f)
-                        .setDuration(200)
-                        .start()
-                } else {
-                    expandableContent.animate()
-                        .alpha(0f)
-                        .setDuration(200)
-                        .withEndAction {
-                            expandableContent.visibility = View.GONE
-                        }
-                        .start()
-                    ivExpand.animate()
-                        .rotation(0f)
-                        .setDuration(200)
-                        .start()
-                }
+                toggleExpand(expandableContent, ivExpand)
             }
 
             container.addView(itemView)
+        }
+        
+        updateAttendanceUI()
+    }
+    
+    private fun toggleExpand(expandableContent: View, ivExpand: ImageView) {
+        if (expandableContent.visibility == View.GONE) {
+            expandableContent.visibility = View.VISIBLE
+            expandableContent.alpha = 0f
+            expandableContent.animate()
+                .alpha(1f)
+                .setDuration(250)
+                .start()
+            ivExpand.animate()
+                .rotation(180f)
+                .setDuration(200)
+                .start()
+        } else {
+            expandableContent.animate()
+                .alpha(0f)
+                .setDuration(200)
+                .withEndAction {
+                    expandableContent.visibility = View.GONE
+                }
+                .start()
+            ivExpand.animate()
+                .rotation(0f)
+                .setDuration(200)
+                .start()
         }
     }
 
@@ -231,63 +305,103 @@ class PresensiActivity : AppCompatActivity() {
     }
 
     private fun performPresensi() {
+        val s = schedule ?: return
+        
+        if (prefManager.isGuestMode) {
+            // Guest mode - simulate success
+            simulatePresensiSuccess()
+            return
+        }
+        
+        if (s.encryptedId.isEmpty()) {
+            Toast.makeText(this, "Data presensi tidak tersedia", Toast.LENGTH_SHORT).show()
+            return
+        }
+        
         binding.btnPresensi.isEnabled = false
         binding.btnPresensi.text = getString(R.string.processing)
         
         lifecycleScope.launch {
-            // Simulate server response (in real app, this would be actual API call)
-            kotlinx.coroutines.delay(1500)
+            val result = repository.submitAttendance(s.encryptedId)
             
-            // Simulate random response: 80% success, 10% expired, 10% other error
-            val responseCode = listOf(200, 200, 200, 200, 419, 500).random()
-            
-            schedule?.let { s ->
-                when (responseCode) {
-                    200 -> {
-                        // Success
-                        repository.updateAttendance(s.id, true, System.currentTimeMillis())
-                        hadirCount++
-                        updateAttendanceUI()
-                        updateLastResponse(200)
-                        
-                        showResponseDialog(
-                            title = getString(R.string.presensi_success),
-                            message = getString(R.string.response_200_ok),
-                            isSuccess = true
-                        )
-                        binding.btnPresensi.text = getString(R.string.presensi_already)
-                    }
-                    419 -> {
-                        // Session expired - show toast and redirect to login
-                        updateLastResponse(419)
-                        
-                        Toast.makeText(
-                            this@PresensiActivity,
-                            getString(R.string.session_expired_reload),
-                            Toast.LENGTH_LONG
-                        ).show()
-                        
-                        // Redirect to login after delay
-                        kotlinx.coroutines.delay(2000)
-                        val intent = Intent(this@PresensiActivity, LoginActivity::class.java)
-                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-                        startActivity(intent)
-                        finish()
-                    }
-                    else -> {
-                        // Other error
-                        updateLastResponse(responseCode)
-                        
-                        showResponseDialog(
-                            title = getString(R.string.response_failed),
-                            message = getString(R.string.response_error, responseCode),
-                            isSuccess = false
-                        )
-                        binding.btnPresensi.isEnabled = true
-                        binding.btnPresensi.text = getString(R.string.presensi_start)
-                    }
+            result.onSuccess { attendanceResult ->
+                if (attendanceResult.success) {
+                    repository.updateAttendance(s.id, true, System.currentTimeMillis())
+                    hadirCount++
+                    updateAttendanceUI()
+                    updateLastResponse(200)
+                    
+                    showResponseDialog(
+                        title = getString(R.string.presensi_success),
+                        message = attendanceResult.message,
+                        isSuccess = true
+                    )
+                    binding.btnPresensi.text = getString(R.string.presensi_already)
+                } else {
+                    updateLastResponse(400)
+                    showResponseDialog(
+                        title = getString(R.string.response_failed),
+                        message = attendanceResult.message,
+                        isSuccess = false
+                    )
+                    binding.btnPresensi.isEnabled = true
+                    binding.btnPresensi.text = getString(R.string.presensi_start)
+                }
+            }.onFailure { error ->
+                if (error is SessionExpiredException) {
+                    handleSessionExpired()
+                } else {
+                    updateLastResponse(500)
+                    showResponseDialog(
+                        title = getString(R.string.response_failed),
+                        message = error.message ?: "Terjadi kesalahan",
+                        isSuccess = false
+                    )
+                    binding.btnPresensi.isEnabled = true
+                    binding.btnPresensi.text = getString(R.string.presensi_start)
                 }
             }
+        }
+    }
+    
+    private fun simulatePresensiSuccess() {
+        binding.btnPresensi.isEnabled = false
+        binding.btnPresensi.text = getString(R.string.processing)
+        
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(1500)
+            
+            schedule?.let { s ->
+                repository.updateAttendance(s.id, true, System.currentTimeMillis())
+                hadirCount++
+                updateAttendanceUI()
+                updateLastResponse(200)
+                
+                showResponseDialog(
+                    title = getString(R.string.presensi_success),
+                    message = getString(R.string.response_200_ok),
+                    isSuccess = true
+                )
+                binding.btnPresensi.text = getString(R.string.presensi_already)
+            }
+        }
+    }
+    
+    private fun handleSessionExpired() {
+        updateLastResponse(419)
+        
+        Toast.makeText(
+            this,
+            getString(R.string.session_expired_reload),
+            Toast.LENGTH_LONG
+        ).show()
+        
+        lifecycleScope.launch {
+            kotlinx.coroutines.delay(2000)
+            val intent = Intent(this@PresensiActivity, LoginActivity::class.java)
+            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            startActivity(intent)
+            finish()
         }
     }
 

@@ -12,7 +12,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.risuncode.mybest.R
 import com.risuncode.mybest.data.AppDatabase
-import com.risuncode.mybest.data.DummyDataGenerator
 import com.risuncode.mybest.data.entity.ScheduleEntity
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.FragmentJadwalBinding
@@ -57,9 +56,21 @@ class JadwalFragment : Fragment() {
 
     private fun refreshData() {
         viewLifecycleOwner.lifecycleScope.launch {
-            // Add small delay for visual feedback
-            kotlinx.coroutines.delay(500)
-            loadScheduleData()
+            // Try to sync from server
+            val result = repository.syncScheduleFromServer()
+            
+            result.onSuccess {
+                loadScheduleData()
+            }.onFailure { error ->
+                // Show error but still load local data
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    error.message ?: "Gagal sinkronisasi",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+                loadScheduleData()
+            }
+            
             binding.swipeRefresh.isRefreshing = false
         }
     }
@@ -79,7 +90,6 @@ class JadwalFragment : Fragment() {
     private fun loadScheduleData() {
         viewLifecycleOwner.lifecycleScope.launch {
             val allSchedules = repository.getAllSchedules().firstOrNull() ?: emptyList()
-            val todaySchedules = DummyDataGenerator.getTodaySchedules(allSchedules)
             val totalSks = repository.getTotalSks()
             
             // Update stats
@@ -184,7 +194,7 @@ class JadwalFragment : Fragment() {
      * - Gray: Today but time has passed
      */
     private fun getScheduleColorRes(schedule: ScheduleEntity): Int {
-        val today = DummyDataGenerator.getCurrentDayInIndonesian()
+        val today = getCurrentDayInIndonesian()
         
         if (schedule.day != today) {
             return R.color.schedule_future
@@ -236,6 +246,20 @@ class JadwalFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+    
+    private fun getCurrentDayInIndonesian(): String {
+        val calendar = Calendar.getInstance()
+        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> "Senin"
+            Calendar.TUESDAY -> "Selasa"
+            Calendar.WEDNESDAY -> "Rabu"
+            Calendar.THURSDAY -> "Kamis"
+            Calendar.FRIDAY -> "Jumat"
+            Calendar.SATURDAY -> "Sabtu"
+            Calendar.SUNDAY -> "Minggu"
+            else -> "Senin"
+        }
     }
 }
 

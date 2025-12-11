@@ -4,17 +4,21 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.google.android.material.snackbar.Snackbar
 import com.risuncode.mybest.R
-import com.risuncode.mybest.data.DataInitializer
+import com.risuncode.mybest.data.AppDatabase
+import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.ActivityLoginBinding
 import com.risuncode.mybest.ui.main.MainActivity
 import com.risuncode.mybest.util.PreferenceManager
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityLoginBinding
     private lateinit var prefManager: PreferenceManager
+    private lateinit var repository: AppRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,6 +26,7 @@ class LoginActivity : AppCompatActivity() {
         setContentView(binding.root)
         
         prefManager = PreferenceManager(this)
+        repository = AppRepository(AppDatabase.getDatabase(this))
         
         setupViews()
         loadSavedCredentials()
@@ -37,9 +42,8 @@ class LoginActivity : AppCompatActivity() {
             showForgotPasswordInfo()
         }
 
-        binding.btnSkipLogin.setOnClickListener {
-            startGuestMode()
-        }
+        // Hide skip login button - login is now required
+        binding.btnSkipLogin.visibility = android.view.View.GONE
     }
 
     private fun loadSavedCredentials() {
@@ -70,21 +74,38 @@ class LoginActivity : AppCompatActivity() {
         // Disable all inputs during auto-login
         setInputsEnabled(false)
         
-        // Simulate login delay (replace with actual API call later)
-        binding.root.postDelayed({
-            showLoading(false)
-            prefManager.isGuestMode = false
-            prefManager.isLoggedIn = true
+        val nim = prefManager.savedNim
+        val password = prefManager.savedPassword
+        
+        lifecycleScope.launch {
+            val result = repository.performLogin(nim, password)
             
-            // Show success toast
-            Toast.makeText(
-                this, 
-                getString(R.string.login_success_welcome, prefManager.savedNim), 
-                Toast.LENGTH_SHORT
-            ).show()
-            
-            navigateToMain()
-        }, 2000)
+            result.onSuccess {
+                prefManager.isLoggedIn = true
+                prefManager.userName = nim
+                
+                // Sync schedule in background
+                repository.syncScheduleFromServer()
+                
+                Toast.makeText(
+                    this@LoginActivity, 
+                    getString(R.string.login_success_welcome, nim), 
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                navigateToMain()
+            }.onFailure { error ->
+                showLoading(false)
+                setInputsEnabled(true)
+                binding.btnLogin.text = getString(R.string.login_button)
+                
+                Snackbar.make(
+                    binding.root,
+                    error.message ?: "Login gagal",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     private fun attemptLogin() {
@@ -106,45 +127,57 @@ class LoginActivity : AppCompatActivity() {
             binding.tilPassword.error = null
         }
 
-        // Save credentials and enable auto-login if "remember me" is checked
-        if (binding.cbRemember.isChecked) {
-            prefManager.rememberMe = true
-            prefManager.savedNim = nim
-            prefManager.savedPassword = password
-            prefManager.autoLoginEnabled = true
-        } else {
-            prefManager.rememberMe = false
-            prefManager.savedNim = ""
-            prefManager.savedPassword = ""
-            prefManager.autoLoginEnabled = false
-        }
-
-        // TODO: Implement actual login API call
-        // For now, just navigate to MainActivity
+        // Show loading
         showLoading(true)
+        setInputsEnabled(false)
         
-        // Simulate login delay
-        binding.root.postDelayed({
-            showLoading(false)
-            prefManager.isGuestMode = false
-            prefManager.isLoggedIn = true
+        lifecycleScope.launch {
+            val result = repository.performLogin(nim, password)
             
-            // Show success toast
-            Toast.makeText(
-                this, 
-                getString(R.string.login_success_welcome, nim), 
-                Toast.LENGTH_SHORT
-            ).show()
-            
-            navigateToMain()
-        }, 1500)
+            result.onSuccess {
+                // Save credentials if "remember me" is checked
+                if (binding.cbRemember.isChecked) {
+                    prefManager.rememberMe = true
+                    prefManager.savedNim = nim
+                    prefManager.savedPassword = password
+                    prefManager.autoLoginEnabled = true
+                } else {
+                    prefManager.rememberMe = false
+                    prefManager.savedNim = ""
+                    prefManager.savedPassword = ""
+                    prefManager.autoLoginEnabled = false
+                }
+                
+                prefManager.isLoggedIn = true
+                prefManager.userName = nim
+                
+                // Sync schedule in background
+                repository.syncScheduleFromServer()
+                
+                Toast.makeText(
+                    this@LoginActivity, 
+                    getString(R.string.login_success_welcome, nim), 
+                    Toast.LENGTH_SHORT
+                ).show()
+                
+                navigateToMain()
+            }.onFailure { error ->
+                showLoading(false)
+                setInputsEnabled(true)
+                
+                Snackbar.make(
+                    binding.root,
+                    error.message ?: "Login gagal",
+                    Snackbar.LENGTH_LONG
+                ).show()
+            }
+        }
     }
 
     private fun setInputsEnabled(enabled: Boolean) {
         binding.etNim.isEnabled = enabled
         binding.etPassword.isEnabled = enabled
         binding.cbRemember.isEnabled = enabled
-        binding.btnSkipLogin.isEnabled = enabled
         binding.tvForgotPassword.isEnabled = enabled
     }
 
@@ -159,19 +192,6 @@ class LoginActivity : AppCompatActivity() {
             getString(R.string.contact_admin_reset),
             Snackbar.LENGTH_LONG
         ).show()
-    }
-
-    private fun startGuestMode() {
-        showLoading(true)
-        
-        prefManager.isGuestMode = true
-        DataInitializer.initializeGuestData(this)
-        
-        // Small delay to ensure data is initialized
-        binding.root.postDelayed({
-            showLoading(false)
-            navigateToMain()
-        }, 500)
     }
 
     private fun navigateToMain() {

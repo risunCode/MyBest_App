@@ -4,7 +4,7 @@ Android application for UBSI (Universitas Bina Sarana Informatika) students to m
 
 ## Project Information
 
-- **Package**: `com.ubsi.mybest`
+- **Package**: `com.risuncode.mybest`
 - **Version**: 1.0.0 (versionCode: 1)
 - **Min SDK**: 24 (Android 7.0)
 - **Target SDK**: 34 (Android 14)
@@ -33,18 +33,37 @@ Android application for UBSI (Universitas Bina Sarana Informatika) students to m
 ```
 app/
 ├── src/main/
-│   ├── java/com/ubsi/mybest/
+│   ├── java/com/risuncode/mybest/
+│   │   ├── data/
+│   │   │   ├── dao/           # Data Access Objects
+│   │   │   ├── entity/        # Database entities
+│   │   │   ├── repository/    # Repository pattern
+│   │   │   ├── AppDatabase.kt
+│   │   │   ├── DataInitializer.kt
+│   │   │   └── DummyDataGenerator.kt
 │   │   ├── ui/
 │   │   │   ├── setup/         # Initial setup & permissions
 │   │   │   ├── login/         # Login functionality
-│   │   │   └── main/          # Main application screen
-│   │   ├── util/              # Utility classes
-│   │   │   └── PreferenceManager.kt
-│   │   └── service/           # Background services (planned)
+│   │   │   ├── main/          # Main application screen
+│   │   │   ├── dashboard/     # Dashboard fragment
+│   │   │   ├── jadwal/        # Schedule fragment
+│   │   │   ├── profil/        # Profile fragment
+│   │   │   ├── presensi/      # Attendance activity
+│   │   │   ├── tugas/         # Assignments (TugasActivity, PdfViewerActivity)
+│   │   │   └── notification/  # Notification activity
+│   │   ├── util/
+│   │   │   ├── PreferenceManager.kt
+│   │   │   └── StringUtils.kt
+│   │   ├── service/           # Background services (planned)
+│   │   ├── AboutActivity.kt
+│   │   ├── AutoLoginActivity.kt
+│   │   ├── NotificationSettingsActivity.kt
+│   │   └── ReplacementClassActivity.kt
 │   ├── res/
 │   │   ├── layout/            # XML layout files
 │   │   ├── values/            # Resources (strings, colors, themes)
 │   │   ├── drawable/          # Icons and graphics
+│   │   ├── anim/              # Animations
 │   │   └── mipmap/            # App launcher icons
 │   └── AndroidManifest.xml
 └── build.gradle.kts
@@ -109,13 +128,22 @@ The application requests the following permissions:
 ## Development Status
 
 This is an active development project. The current implementation includes:
-- ✅ Initial setup flow
-- ✅ Permission handling
-- ✅ Login UI and validation
-- ✅ Preference management
-- 🚧 Main application interface (in progress)
+- ✅ Initial setup flow with agreement auto-expand
+- ✅ Permission handling (Notification, Alarm)
+- ✅ Login UI with auto-login feature
+- ✅ Preference management (PreferenceManager)
+- ✅ Main application interface with Bottom Nav + Drawer
+- ✅ Dashboard with App Status & Today's Classes
+- ✅ Jadwal Kuliah with stats & upcoming class
+- ✅ Presensi (Attendance) with expandable records
+- ✅ Tugas (Assignments) with PDF viewer
+- ✅ Profile management
+- ✅ Room Database with Repository pattern
+- ✅ Guest Mode with dummy data
+- ✅ SwipeRefresh & Shimmer loading effects
 - 🚧 API integration (planned)
 - 🚧 Background services (planned)
+- 🚧 Real-time notifications (planned)
 
 ## Language
 

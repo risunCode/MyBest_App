@@ -43,7 +43,7 @@ Aplikasi Android tidak resmi untuk mahasiswa Universitas Bina Sarana Informatika
 
 ```
 app/src/main/
-├── java/com/ubsi/mybest/
+├── java/com/risuncode/mybest/
 │   ├── data/
 │   │   ├── dao/              # Data Access Objects
 │   │   ├── entity/           # Database entities
@@ -57,16 +57,23 @@ app/src/main/
 │   │   ├── login/            # Activity login
 │   │   ├── main/             # Activity utama
 │   │   ├── notification/     # Activity notifikasi
+│   │   ├── presensi/         # Activity presensi
 │   │   ├── profil/           # Fragment profil
-│   │   └── setup/            # Activity setup awal
+│   │   ├── setup/            # Activity setup awal
+│   │   └── tugas/            # Activity tugas & PDF viewer
 │   ├── util/
 │   │   ├── PreferenceManager.kt
 │   │   └── StringUtils.kt
-│   └── service/              # Background services
+│   ├── service/              # Background services
+│   ├── AboutActivity.kt
+│   ├── AutoLoginActivity.kt
+│   ├── NotificationSettingsActivity.kt
+│   └── ReplacementClassActivity.kt
 └── res/
     ├── layout/               # XML layouts
     ├── values/               # Resources
-    └── drawable/             # Icons dan graphics
+    ├── drawable/             # Icons dan graphics
+    └── anim/                 # Animations
 ```
 
 ---
@@ -167,7 +174,7 @@ Kontribusi sangat diterima. Silakan:
 ### Panduan Kontribusi
 - Gunakan ViewBinding, bukan findViewById
 - Semua string harus di `strings.xml`
-- Ikuti konvensi penamaan di `.zencoder/rules/mybest-ubsi.md`
+- Ikuti konvensi penamaan di `.appDocumentation/PROJECT_DETAILS.md`
 - Tulis komentar dalam Bahasa Indonesia atau Inggris
 
 ---
@@ -175,27 +182,27 @@ Kontribusi sangat diterima. Silakan:
 ## Roadmap
 
 ### Versi 1.0.0 (Saat ini)
-- [x] Login dan autentikasi
-- [x] Guest mode
-- [x] Dashboard dengan statistik
-- [x] Jadwal kuliah
+- [x] Login dan autentikasi dengan auto-login
+- [x] Guest mode dengan dummy data
+- [x] Dashboard dengan App Status & Jadwal Hari Ini
+- [x] Jadwal kuliah dengan stats & countdown
+- [x] Presensi dengan expandable records
+- [x] Tugas dengan PDF viewer
 - [x] Profil mahasiswa
+- [x] SwipeRefresh & Shimmer loading
+- [x] Sidebar dengan active state highlight
 
 ### Versi 1.1.0 (Direncanakan)
+- [ ] API Integration (real data dari BSI)
 - [ ] Presensi otomatis
 - [ ] Notifikasi push
 - [ ] Alarm pengingat
-
-### Versi 1.2.0 (Direncanakan)
-- [ ] Kuliah pengganti
-- [ ] Daftar tugas
-- [ ] Nilai mata kuliah
 
 ---
 
 ## Lisensi
 
-Proyek ini dilisensikan di bawah MIT License. Lihat file `LICENSE` untuk detail.
+Proyek ini dilisensikan di bawah Apache License 2.0. Lihat file `LICENSE` untuk detail.
 
 ---
 

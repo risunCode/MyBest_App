@@ -17,11 +17,13 @@ class TugasActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_SCHEDULE_ID = "schedule_id"
         const val EXTRA_SUBJECT_NAME = "subject_name"
+        const val EXTRA_ENCRYPTED_ID = "encrypted_id"
 
-        fun start(context: Context, scheduleId: Int, subjectName: String) {
+        fun start(context: Context, scheduleId: Int, subjectName: String, encryptedId: String = "") {
             val intent = Intent(context, TugasActivity::class.java).apply {
                 putExtra(EXTRA_SCHEDULE_ID, scheduleId)
                 putExtra(EXTRA_SUBJECT_NAME, subjectName)
+                putExtra(EXTRA_ENCRYPTED_ID, encryptedId)
             }
             context.startActivity(intent)
         }
@@ -33,9 +35,10 @@ class TugasActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val subjectName = intent.getStringExtra(EXTRA_SUBJECT_NAME) ?: ""
+        val encryptedId = intent.getStringExtra(EXTRA_ENCRYPTED_ID) ?: ""
 
         setupAppBar(subjectName)
-        setupTabs()
+        setupTabs(encryptedId)
     }
 
     private fun setupAppBar(subjectName: String) {
@@ -43,13 +46,13 @@ class TugasActivity : AppCompatActivity() {
         binding.tvSubjectName.text = subjectName
     }
 
-    private fun setupTabs() {
+    private fun setupTabs(encryptedId: String) {
         val tabTitles = listOf(
             getString(R.string.data_penugasan),
             getString(R.string.data_nilai_tugas)
         )
 
-        binding.viewPager.adapter = TugasPagerAdapter(this, tabTitles.size)
+        binding.viewPager.adapter = TugasPagerAdapter(this, tabTitles.size, encryptedId)
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = tabTitles[position]
@@ -58,14 +61,15 @@ class TugasActivity : AppCompatActivity() {
 
     private inner class TugasPagerAdapter(
         activity: AppCompatActivity,
-        private val itemCount: Int
+        private val itemCount: Int,
+        private val encryptedId: String
     ) : FragmentStateAdapter(activity) {
 
         override fun getItemCount(): Int = itemCount
 
         override fun createFragment(position: Int): Fragment {
             return when (position) {
-                0 -> TugasListFragment.newInstance()
+                0 -> TugasListFragment.newInstance(encryptedId)
                 else -> TugasEmptyFragment.newInstance(
                     getString(R.string.no_nilai),
                     getString(R.string.no_nilai_desc)

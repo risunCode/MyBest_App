@@ -11,7 +11,6 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.risuncode.mybest.R
 import com.risuncode.mybest.data.AppDatabase
-import com.risuncode.mybest.data.DataInitializer
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.ActivityMainBinding
 import com.risuncode.mybest.ui.dashboard.DashboardFragment
@@ -171,14 +170,11 @@ class MainActivity : AppCompatActivity() {
     private fun logout() {
         // Clear all data properly
         lifecycleScope.launch {
-            // Clear database if in guest mode
-            if (prefManager.isGuestMode) {
-                repository.clearAllData()
-            }
+            // Clear database and API session
+            repository.performLogout()
             
             // Clear auth data from preferences
             prefManager.clearAuthData()
-            prefManager.isGuestMode = false
             prefManager.isSetupCompleted = false
             
             // Disable auto-login temporarily (but keep saved credentials for autofill)

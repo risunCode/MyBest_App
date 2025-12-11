@@ -15,7 +15,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.risuncode.mybest.R
 import com.risuncode.mybest.data.AppDatabase
-import com.risuncode.mybest.data.DummyDataGenerator
 import com.risuncode.mybest.data.entity.ScheduleEntity
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.FragmentDashboardBinding
@@ -95,7 +94,19 @@ class DashboardFragment : Fragment() {
     private fun refreshData() {
         viewLifecycleOwner.lifecycleScope.launch {
             showSkeleton()
-            kotlinx.coroutines.delay(600)
+            
+            // Sync from server if not guest mode
+            if (!prefManager.isGuestMode) {
+                val result = repository.syncScheduleFromServer()
+                result.onFailure { error ->
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        error.message ?: "Gagal sinkronisasi",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+            
             setupUI()
             hideSkeleton()
             binding.swipeRefresh.isRefreshing = false
@@ -211,7 +222,7 @@ class DashboardFragment : Fragment() {
     private fun loadTodayClasses() {
         viewLifecycleOwner.lifecycleScope.launch {
             val allSchedules = repository.getAllSchedules().firstOrNull() ?: emptyList()
-            val todaySchedules = DummyDataGenerator.getTodaySchedules(allSchedules)
+            val todaySchedules = getTodaySchedules(allSchedules)
             
             binding.todayClassesContainer.removeAllViews()
             
@@ -297,6 +308,25 @@ class DashboardFragment : Fragment() {
     override fun onDestroyView() {
         super.onDestroyView()
         _binding = null
+    }
+    
+    private fun getTodaySchedules(schedules: List<ScheduleEntity>): List<ScheduleEntity> {
+        val today = getCurrentDayInIndonesian()
+        return schedules.filter { it.day.equals(today, ignoreCase = true) }
+    }
+    
+    private fun getCurrentDayInIndonesian(): String {
+        val calendar = Calendar.getInstance()
+        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
+            Calendar.MONDAY -> "Senin"
+            Calendar.TUESDAY -> "Selasa"
+            Calendar.WEDNESDAY -> "Rabu"
+            Calendar.THURSDAY -> "Kamis"
+            Calendar.FRIDAY -> "Jumat"
+            Calendar.SATURDAY -> "Sabtu"
+            Calendar.SUNDAY -> "Minggu"
+            else -> "Senin"
+        }
     }
 }
 

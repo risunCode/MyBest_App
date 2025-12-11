@@ -8,6 +8,7 @@ data class ScheduleEntity(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
     
+    val encryptedId: String = "", // BSI API encrypted course ID
     val subjectName: String,
     val subjectCode: String,
     val dosen: String,
@@ -19,9 +20,14 @@ data class ScheduleEntity(
     val kelompokPraktek: String,
     val kodeGabung: String,
     
+    // Links for navigation
+    val masukKelasLink: String = "",
+    val tugasLink: String = "",
+    
     val isAttended: Boolean = false,
     val attendanceTime: Long? = null,
     
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()
 )
+

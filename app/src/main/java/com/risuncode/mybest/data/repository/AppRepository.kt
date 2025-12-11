@@ -1,6 +1,12 @@
 package com.risuncode.mybest.data.repository
 
 import com.risuncode.mybest.data.AppDatabase
+import com.risuncode.mybest.data.api.ApiService
+import com.risuncode.mybest.data.api.AttendanceFormData
+import com.risuncode.mybest.data.api.AttendanceRecord
+import com.risuncode.mybest.data.api.AttendanceResult
+import com.risuncode.mybest.data.api.ParsedAssignment
+import com.risuncode.mybest.data.api.ParsedCourse
 import com.risuncode.mybest.data.entity.NotificationEntity
 import com.risuncode.mybest.data.entity.ScheduleEntity
 import com.risuncode.mybest.data.entity.UserEntity
@@ -8,7 +14,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Repository sebagai single source of truth untuk akses data.
- * Menggabungkan akses ke Room Database dan operasi data lainnya.
+ * Menggabungkan akses ke Room Database dan API Service.
  */
 class AppRepository(private val database: AppDatabase) {
     
@@ -16,7 +22,167 @@ class AppRepository(private val database: AppDatabase) {
     private val scheduleDao = database.scheduleDao()
     private val notificationDao = database.notificationDao()
     
-    // ==================== USER ====================
+    // API Service
+    private val apiService = ApiService()
+    
+    // ==================== AUTH / LOGIN ====================
+    
+    /**
+     * Perform full login flow: get captcha, solve it, submit login
+     */
+    suspend fun performLogin(nim: String, password: String): Result<Unit> {
+        // 1. Get login page with CSRF and captcha
+        val loginPageResult = apiService.getLoginPage()
+        val loginPage = loginPageResult.getOrElse { 
+            return Result.failure(it) 
+        }
+        
+        // 2. Submit login with auto-solved captcha
+        val loginResult = apiService.login(
+            nim = nim,
+            password = password,
+            csrfToken = loginPage.csrfToken,
+            captchaAnswer = loginPage.captchaAnswer
+        )
+        
+        loginResult.getOrElse { 
+            return Result.failure(it) 
+        }
+        
+        // 3. Sync user data from profile
+        syncUserFromServer()
+        
+        return Result.success(Unit)
+    }
+    
+    /**
+     * Logout and clear all data
+     */
+    suspend fun performLogout(): Result<Unit> {
+        apiService.logout()
+        clearAllData()
+        return Result.success(Unit)
+    }
+    
+    /**
+     * Check if session is valid
+     */
+    suspend fun checkSession(): Boolean {
+        return apiService.checkSession().getOrDefault(false)
+    }
+    
+    // ==================== SYNC FROM SERVER ====================
+    
+    /**
+     * Sync schedule from BSI server
+     */
+    suspend fun syncScheduleFromServer(): Result<List<ScheduleEntity>> {
+        val result = apiService.getSchedule()
+        val courses = result.getOrElse { 
+            return Result.failure(it) 
+        }
+        
+        // Convert to entities
+        val entities = courses.map { it.toScheduleEntity() }
+        
+        // Clear old and insert new
+        scheduleDao.deleteAllSchedules()
+        scheduleDao.insertSchedules(entities)
+        
+        return Result.success(entities)
+    }
+    
+    /**
+     * Sync user profile from server
+     */
+    suspend fun syncUserFromServer(): Result<UserEntity> {
+        val result = apiService.getProfile()
+        val profile = result.getOrElse { 
+            return Result.failure(it) 
+        }
+        
+        // Create or update user entity (nim is primary key)
+        val userEntity = UserEntity(
+            nim = "", // Will be filled from preferences
+            name = profile.name,
+            email = profile.email,
+            prodi = "",
+            angkatan = "",
+            isGuestMode = false
+        )
+        
+        userDao.deleteAllUsers()
+        userDao.insertUser(userEntity)
+        
+        return Result.success(userEntity)
+    }
+    
+    // ==================== ATTENDANCE API ====================
+    
+    /**
+     * Get attendance records for a course
+     */
+    suspend fun getAttendanceRecords(encryptedCourseId: String): Result<List<AttendanceRecord>> {
+        return apiService.getAttendanceRecords(encryptedCourseId)
+    }
+    
+    /**
+     * Submit attendance for a course
+     */
+    suspend fun submitAttendance(encryptedCourseId: String): Result<AttendanceResult> {
+        // Get form data first
+        val pageResult = apiService.getAttendancePage(encryptedCourseId)
+        val page = pageResult.getOrElse { 
+            return Result.failure(it) 
+        }
+        
+        val formData = page.formData 
+            ?: return Result.failure(Exception("Data pertemuan tidak tersedia"))
+        
+        // Submit
+        return apiService.submitAttendance(encryptedCourseId, formData)
+    }
+    
+    // ==================== ASSIGNMENT API ====================
+    
+    /**
+     * Get assignments for a course
+     */
+    suspend fun getAssignments(encryptedCourseId: String): Result<List<ParsedAssignment>> {
+        return apiService.getAssignments(encryptedCourseId)
+    }
+    
+    /**
+     * Download assignment file
+     */
+    suspend fun downloadAssignmentFile(downloadLink: String): Result<ByteArray> {
+        // Parse FORM:token|id|filename format
+        if (!downloadLink.startsWith("FORM:")) {
+            return Result.failure(Exception("Invalid download link format"))
+        }
+        
+        val parts = downloadLink.removePrefix("FORM:").split("|")
+        if (parts.size != 3) {
+            return Result.failure(Exception("Invalid download link parts"))
+        }
+        
+        val (token, id, filename) = parts
+        return apiService.downloadFile(token, id, filename)
+    }
+    
+    /**
+     * Submit assignment
+     */
+    suspend fun submitAssignment(encryptedAssignmentId: String, link: String): Result<Unit> {
+        val formResult = apiService.getAssignmentForm(encryptedAssignmentId)
+        val formData = formResult.getOrElse { 
+            return Result.failure(it) 
+        }
+        
+        return apiService.submitAssignment(formData, link)
+    }
+    
+    // ==================== USER (LOCAL) ====================
     
     fun getCurrentUser(): Flow<UserEntity?> = userDao.getCurrentUser()
     
@@ -28,7 +194,7 @@ class AppRepository(private val database: AppDatabase) {
         userDao.deleteAllUsers()
     }
     
-    // ==================== SCHEDULE ====================
+    // ==================== SCHEDULE (LOCAL) ====================
     
     fun getAllSchedules(): Flow<List<ScheduleEntity>> = scheduleDao.getAllSchedules()
     
@@ -67,7 +233,7 @@ class AppRepository(private val database: AppDatabase) {
         scheduleDao.deleteAllSchedules()
     }
     
-    // ==================== NOTIFICATION ====================
+    // ==================== NOTIFICATION (LOCAL) ====================
     
     fun getAllNotifications(): Flow<List<NotificationEntity>> = 
         notificationDao.getAllNotifications()
@@ -104,4 +270,23 @@ class AppRepository(private val database: AppDatabase) {
         deleteAllSchedules()
         deleteAllNotifications()
     }
+}
+
+// Extension function to convert API response to entity
+fun ParsedCourse.toScheduleEntity(): ScheduleEntity {
+    return ScheduleEntity(
+        encryptedId = encryptedId,
+        subjectName = name,
+        subjectCode = kodeMtk,
+        dosen = kodeDosen,
+        day = day,
+        startTime = jamMasuk,
+        endTime = jamKeluar,
+        room = noRuang,
+        sks = sks,
+        kelompokPraktek = kelPraktek,
+        kodeGabung = kodeGabung,
+        masukKelasLink = masukKelasLink,
+        tugasLink = tugasLink
+    )
 }
