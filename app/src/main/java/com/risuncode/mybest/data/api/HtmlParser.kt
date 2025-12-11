@@ -98,11 +98,27 @@ object HtmlParser {
                 val scheduleText = card.select(".pricing-save").text() // "Senin - 08:00-10:30"
                 
                 // Parse day and time
-                val scheduleParts = scheduleText.split(" - ")
-                val day = scheduleParts.getOrNull(0) ?: ""
-                val timeParts = scheduleParts.getOrNull(1)?.split("-") ?: listOf("", "")
-                val jamMasuk = timeParts.getOrNull(0)?.trim() ?: ""
-                val jamKeluar = timeParts.getOrNull(1)?.trim() ?: ""
+                // Format: "Senin - 08:00-10:30" OR "Senin, 08:00 - 10:30"
+                var day = ""
+                var jamMasuk = ""
+                var jamKeluar = ""
+                
+                // Try Regex first (for "Day, HH:mm - HH:mm" format)
+                val regex = """([A-Za-z]+),\s*(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})""".toRegex()
+                val match = regex.find(scheduleText)
+                
+                if (match != null) {
+                    day = match.groupValues[1]
+                    jamMasuk = match.groupValues[2]
+                    jamKeluar = match.groupValues[3]
+                } else {
+                    // Fallback to old split method
+                    val scheduleParts = scheduleText.split(" - ")
+                    day = scheduleParts.getOrNull(0) ?: ""
+                    val timeParts = scheduleParts.getOrNull(1)?.split("-") ?: listOf("", "")
+                    jamMasuk = timeParts.getOrNull(0)?.trim() ?: ""
+                    jamKeluar = timeParts.getOrNull(1)?.trim() ?: ""
+                }
                 
                 // Parse body details
                 val styledItems = card.select(".styled")

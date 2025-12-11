@@ -221,38 +221,39 @@ class DashboardFragment : Fragment() {
 
     private fun loadTodayClasses() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val allSchedules = repository.getAllSchedules().firstOrNull() ?: emptyList()
-            val todaySchedules = getTodaySchedules(allSchedules)
-            
-            binding.todayClassesContainer.removeAllViews()
-            
-            if (todaySchedules.isEmpty()) {
-                binding.cardNoClasses.visibility = View.VISIBLE
-            } else {
-                binding.cardNoClasses.visibility = View.GONE
+            repository.getAllSchedules().collect { allSchedules ->
+                val todaySchedules = getTodaySchedules(allSchedules)
                 
-                todaySchedules.forEachIndexed { index, schedule ->
-                    val cardView = createScheduleCard(schedule)
+                binding.todayClassesContainer.removeAllViews()
+                
+                if (todaySchedules.isEmpty()) {
+                    binding.cardNoClasses.visibility = View.VISIBLE
+                } else {
+                    binding.cardNoClasses.visibility = View.GONE
                     
-                    // Add margin between cards
-                    val layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    )
-                    if (index > 0) {
-                        layoutParams.topMargin = resources.getDimensionPixelSize(R.dimen.spacing_sm)
+                    todaySchedules.forEachIndexed { index, schedule ->
+                        val cardView = createScheduleCard(schedule)
+                        
+                        // Add margin between cards
+                        val layoutParams = LinearLayout.LayoutParams(
+                            LinearLayout.LayoutParams.MATCH_PARENT,
+                            LinearLayout.LayoutParams.WRAP_CONTENT
+                        )
+                        if (index > 0) {
+                            layoutParams.topMargin = resources.getDimensionPixelSize(R.dimen.spacing_sm)
+                        }
+                        cardView.layoutParams = layoutParams
+                        
+                        binding.todayClassesContainer.addView(cardView)
                     }
-                    cardView.layoutParams = layoutParams
-                    
-                    binding.todayClassesContainer.addView(cardView)
                 }
-            }
-            
-            // Set tips content
-            binding.tvTipsContent.text = if (todaySchedules.isEmpty()) {
-                getString(R.string.tip_no_class_today)
-            } else {
-                getString(R.string.tip_class_count, todaySchedules.size)
+                
+                // Set tips content
+                binding.tvTipsContent.text = if (todaySchedules.isEmpty()) {
+                    getString(R.string.tip_no_class_today)
+                } else {
+                    getString(R.string.tip_class_count, todaySchedules.size)
+                }
             }
         }
     }

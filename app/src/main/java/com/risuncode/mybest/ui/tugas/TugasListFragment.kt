@@ -228,11 +228,15 @@ class TugasListFragment : Fragment() {
     }
     
     private fun downloadAssignment(downloadLink: String, dialogView: View) {
+        val parts = downloadLink.removePrefix("FORM:").split("|")
+        val filename = if (parts.size == 3) parts[2] else "document.pdf"
+        val file = java.io.File(requireContext().cacheDir, "assignments/$filename")
+        
         viewLifecycleOwner.lifecycleScope.launch {
-            val result = repository.downloadAssignmentFile(downloadLink)
+            val result = repository.downloadAssignmentFile(downloadLink, file)
             
-            result.onSuccess { bytes ->
-                Toast.makeText(requireContext(), R.string.file_downloaded, Toast.LENGTH_SHORT).show()
+            result.onSuccess { savedFile ->
+                Toast.makeText(requireContext(), "File tersimpan: ${savedFile.name}", Toast.LENGTH_SHORT).show()
                 dialogView.findViewById<TextView>(R.id.tvFileStatus)?.text = getString(R.string.downloaded)
             }.onFailure { error ->
                 Toast.makeText(requireContext(), "Gagal mengunduh: ${error.message}", Toast.LENGTH_SHORT).show()

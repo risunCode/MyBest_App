@@ -96,7 +96,7 @@ class ApiService {
                 .url(url)
                 .get()
                 .build()
-            client.newCall(request).execute()
+            client.newCall(request).execute().close()
         } catch (e: Exception) {
             // Ignore redirect errors
         }
@@ -120,7 +120,7 @@ class ApiService {
                 .post(formBody)
                 .build()
             
-            client.newCall(request).execute()
+            client.newCall(request).execute().close()
             ApiClient.clearSession()
             
             Result.success(Unit)
@@ -224,7 +224,10 @@ class ApiService {
                 .build()
             
             val response = client.newCall(request).execute()
-            val json = response.body?.string() ?: return@withContext Result.success(emptyList())
+            val json = response.body?.string()
+            response.close()
+            
+            if (json == null) return@withContext Result.success(emptyList())
             
             val records = HtmlParser.parseAttendanceRecords(json)
             Result.success(records)
@@ -328,7 +331,7 @@ class ApiService {
                 .post(formBody)
                 .build()
             
-            client.newCall(request).execute()
+            client.newCall(request).execute().close()
             Result.success(Unit)
         } catch (e: Exception) {
             Result.failure(e)
@@ -434,11 +437,15 @@ class ApiService {
             
             // Handle redirects
             if (response.code == 302) {
-                val location = response.header("Location") ?: return null
+                val location = response.header("Location")
+                response.close()
+                if (location == null) return null
                 return getPageHtml(location)
             }
             
-            response.body?.string()
+            val content = response.body?.string()
+            response.close()
+            content
         } catch (e: javax.net.ssl.SSLHandshakeException) {
             // SSL error - will trigger fallback
             null

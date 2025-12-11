@@ -155,7 +155,7 @@ class AppRepository(private val database: AppDatabase) {
     /**
      * Download assignment file
      */
-    suspend fun downloadAssignmentFile(downloadLink: String): Result<ByteArray> {
+    suspend fun downloadAssignmentFile(downloadLink: String, destinationFile: java.io.File): Result<java.io.File> {
         // Parse FORM:token|id|filename format
         if (!downloadLink.startsWith("FORM:")) {
             return Result.failure(Exception("Invalid download link format"))
@@ -167,7 +167,24 @@ class AppRepository(private val database: AppDatabase) {
         }
         
         val (token, id, filename) = parts
-        return apiService.downloadFile(token, id, filename)
+        
+        // Check if file already exists in cache (optional check, but good for performance)
+        if (destinationFile.exists()) {
+            return Result.success(destinationFile)
+        }
+        
+        val result = apiService.downloadFile(token, id, filename)
+        
+        return result.mapCatching { bytes ->
+            try {
+                destinationFile.parentFile?.mkdirs()
+                destinationFile.writeBytes(bytes)
+                destinationFile
+            } catch (e: Exception) {
+                if (destinationFile.exists()) destinationFile.delete()
+                throw e
+            }
+        }
     }
     
     /**

@@ -93,11 +93,37 @@ class PresensiActivity : AppCompatActivity() {
                 if (s.isAttended) {
                     binding.btnPresensi.text = getString(R.string.presensi_already)
                     binding.btnPresensi.isEnabled = false
+                } else if (!isScheduleToday(s.day)) {
+                    binding.btnPresensi.text = "Bukan Jadwal Hari Ini"
+                    binding.btnPresensi.backgroundTintList = android.content.res.ColorStateList.valueOf(
+                        ContextCompat.getColor(this@PresensiActivity, R.color.status_warning)
+                    )
+                    // Disable button for non-today schedules
+                    binding.btnPresensi.isEnabled = false
                 }
 
                 // Load attendance records from API or local
                 loadAttendanceRecords(s.encryptedId)
             }
+        }
+    }
+
+    private fun isScheduleToday(scheduleDay: String): Boolean {
+        val today = getCurrentDayInIndonesian()
+        return scheduleDay.equals(today, ignoreCase = true)
+    }
+
+    private fun getCurrentDayInIndonesian(): String {
+        val calendar = java.util.Calendar.getInstance()
+        return when (calendar.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> "Senin"
+            java.util.Calendar.TUESDAY -> "Selasa"
+            java.util.Calendar.WEDNESDAY -> "Rabu"
+            java.util.Calendar.THURSDAY -> "Kamis"
+            java.util.Calendar.FRIDAY -> "Jumat"
+            java.util.Calendar.SATURDAY -> "Sabtu"
+            java.util.Calendar.SUNDAY -> "Minggu"
+            else -> "Senin"
         }
     }
 
