@@ -4,8 +4,8 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F5F5F5"
-    tools:context="com.ubsi.mybest.AboutActivity">
+    android:background="@color/background"
+    tools:context="com.risuncode.mybest.AboutActivity">
 
     <View
         android:id="@+id/appBarBackground"

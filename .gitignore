@@ -82,3 +82,6 @@ enhance-mybest/
 
 # Kiro
 .kiro/
+
+# Keystore properties (contains passwords)
+keystore.properties

@@ -24,6 +24,10 @@
     <string name="remember_me">Ingat Saya</string>
     <string name="forgot_password">Lupa Password?</string>
     <string name="skip_login">Guest</string>
+    <string name="processing">Memproses…</string>
+    <string name="processing_login">Memproses login anda, tunggu sebentar…</string>
+    <string name="auto_login_wait">Auto Login, silahkan tunggu…</string>
+    <string name="login_success_welcome">Login berhasil, selamat datang %1$s</string>
     
     <!-- Dashboard -->
     <string name="dashboard">Dashboard</string>
@@ -39,6 +43,8 @@
     <string name="starts_in">Mulai dalam %s</string>
     <string name="today_schedule">Jadwal Hari Ini</string>
     <string name="tips_today">Tips Hari Ini</string>
+    <string name="tip_no_class_today">Tidak ada kuliah hari ini. Waktu yang tepat untuk belajar mandiri!</string>
+    <string name="tip_class_count">Kamu memiliki %1$d kelas hari ini. Semangat belajar!</string>
     <string name="sks_label">%d SKS</string>
     
     <!-- Bottom Navigation -->
@@ -49,6 +55,34 @@
     <!-- Quotes -->
     <string name="quote_education">Pendidikan adalah senjata paling ampuh untuk mengubah dunia.</string>
     <string name="quote_author">— Nelson Mandela</string>
+    
+    <string-array name="quotes">
+        <item>Pendidikan adalah senjata paling ampuh untuk mengubah dunia.|Nelson Mandela</item>
+        <item>Belajar tanpa berpikir adalah sia-sia, berpikir tanpa belajar adalah berbahaya.|Confucius</item>
+        <item>Investasi dalam pengetahuan membayar bunga terbaik.|Benjamin Franklin</item>
+        <item>Pendidikan bukan persiapan untuk hidup, pendidikan adalah hidup itu sendiri.|John Dewey</item>
+        <item>Satu-satunya hal yang menghalangi pembelajaranku adalah pendidikanku.|Albert Einstein</item>
+        <item>Belajar adalah harta yang akan mengikuti pemiliknya ke mana pun.|Peribahasa Cina</item>
+        <item>Orang bijak belajar dari kesalahan orang lain, orang bodoh dari kesalahannya sendiri.|Otto von Bismarck</item>
+        <item>Ilmu itu lebih baik daripada harta. Ilmu menjaga engkau, sedangkan harta engkau yang menjaganya.|Ali bin Abi Thalib</item>
+        <item>Barang siapa menempuh jalan untuk mencari ilmu, maka Allah mudahkan baginya jalan menuju surga.|HR. Muslim</item>
+        <item>Tuntutlah ilmu dari buaian sampai ke liang lahat.|Peribahasa Arab</item>
+        <item>Kegagalan adalah kesempatan untuk memulai lagi dengan lebih cerdas.|Henry Ford</item>
+        <item>Sukses adalah guru yang buruk. Ia menggoda orang cerdas untuk berpikir bahwa mereka tidak bisa gagal.|Bill Gates</item>
+        <item>Bermimpilah setinggi langit. Jika engkau jatuh, engkau akan jatuh di antara bintang-bintang.|Ir. Soekarno</item>
+        <item>Gantungkan cita-citamu setinggi langit!|Ir. Soekarno</item>
+        <item>Bangsa yang besar adalah bangsa yang menghormati jasa pahlawannya.|Ir. Soekarno</item>
+        <item>Jangan pernah menyerah karena hal-hal besar membutuhkan waktu.|B.J. Habibie</item>
+        <item>Cintai produk dalam negeri dan jadilah kebanggaan Indonesia.|B.J. Habibie</item>
+        <item>Hidup adalah pilihan. Maka pilihlah yang terbaik.|Najwa Shihab</item>
+        <item>Keberhasilan bukanlah milik orang pintar, melainkan milik mereka yang senantiasa berusaha.|B.J. Habibie</item>
+        <item>Jangan menunggu waktu yang tepat, buatlah waktu menjadi tepat.|Mario Teguh</item>
+        <item>Kesuksesan adalah kemampuan untuk bangkit dari kegagalan.|Merry Riana</item>
+        <item>Mimpi adalah kunci untuk kita menaklukkan dunia.|Nidji</item>
+        <item>Jatuh berdiri lagi, kalah mencoba lagi, gagal bangkit lagi.|Andrie Wongso</item>
+        <item>Bersyukurlah, karena orang yang bersyukur adalah orang paling kaya.|Abdullah Gymnastiar</item>
+        <item>Pendidikan adalah tiket ke masa depan. Hari esok dimiliki oleh orang-orang yang mempersiapkan dirinya sejak hari ini.|Malcolm X</item>
+    </string-array>
     
     <!-- Notification -->
     <string name="notification">Notifikasi</string>
@@ -101,7 +135,6 @@
     <string name="notification_settings_saved">Pengaturan notifikasi berhasil disimpan</string>
     
     <!-- Actions -->
-    <string name="processing">Memproses…</string>
     <string name="refreshing_data">Memperbarui data…</string>
     <string name="feature_not_available">Fitur belum tersedia</string>
     <string name="delete">Hapus</string>
@@ -124,27 +157,54 @@
     <!-- Others -->
     <string name="contact_admin_reset">Hubungi admin kampus untuk reset password</string>
     <string name="share_via">Bagikan via</string>
+    <string name="session_expired_reload">Sesi berakhir (memuat ulang sesi, tunggu sebentar)</string>
     
     <!-- Presensi -->
     <string name="presensi_title">Presensi</string>
     <string name="presensi_start">Mulai Presensi</string>
     <string name="rekap_kehadiran">Rekap Kehadiran</string>
     <string name="hadir">Hadir</string>
-    <string name="izin">Izin</string>
-    <string name="alpha">Alpha</string>
+    <string name="tidak_hadir">Tidak Hadir</string>
     <string name="status">STATUS</string>
     <string name="tanggal">TANGGAL</string>
     <string name="presensi_success">Presensi berhasil dicatat</string>
     <string name="presensi_already">Kamu sudah melakukan presensi hari ini</string>
+    <string name="rangkuman">Rangkuman</string>
+    <string name="berita_acara">Berita Acara</string>
+    <string name="last_server_response">Respon Server Terakhir</string>
+    <string name="response_success">Berhasil</string>
+    <string name="response_failed">Gagal</string>
+    <string name="response_expired">Expired</string>
+    <string name="status_hadir">HADIR</string>
+    <string name="status_tidak_hadir">TIDAK HADIR</string>
+    <string name="response_200_ok">Status: 200 OK\nData berhasil terkirim (Masuk)</string>
+    <string name="response_error">Status: %1$d Error\nTerjadi kesalahan server.</string>
+    <string name="ok">OK</string>
     
     <!-- Tugas -->
     <string name="tugas">Tugas</string>
-    <string name="data_penugasan">Data Penugasan</string>
-    <string name="data_nilai_tugas">Data Nilai Tugas</string>
+    <string name="data_penugasan">DATA PENUGASAN</string>
+    <string name="data_nilai_tugas">DATA NILAI TUGAS</string>
     <string name="no_tugas">Belum Ada Tugas</string>
-    <string name="no_tugas_desc">Tidak ada tugas untuk mata kuliah ini</string>
+    <string name="no_tugas_desc">Tugas untuk mata kuliah ini belum tersedia</string>
     <string name="no_nilai">Belum Ada Nilai</string>
-    <string name="no_nilai_desc">Belum ada nilai tugas yang tersedia</string>
+    <string name="no_nilai_desc">Nilai tugas untuk mata kuliah ini belum tersedia</string>
+    <string name="lihat_tugas">LIHAT TUGAS</string>
+    <string name="tugas_summary">Total: %1$d tugas • Aktif: %2$d • Berakhir: %3$d</string>
+    <string name="pertemuan_n">Pertemuan %1$d</string>
+    <string name="deadline_format">Deadline: %1$s</string>
+    <string name="aktif">Aktif</string>
+    <string name="berakhir">Berakhir</string>
+    <string name="lihat">LIHAT</string>
+    <string name="unduh">UNDUH</string>
+    <string name="not_downloaded">Belum diunduh</string>
+    <string name="downloaded">Sudah diunduh</string>
+    <string name="file_downloaded">File berhasil diunduh</string>
+    <string name="link_google_drive">Link tugas (Google Drive)</string>
+    <string name="kirim_tugas">KIRIM TUGAS</string>
+    <string name="tugas_submitted">Tugas berhasil dikirim</string>
+    <string name="open_in_external">Buka di app lain</string>
+    <string name="no_pdf_app">Tidak ada aplikasi PDF viewer</string>
     
     <!-- About -->
     <string name="about_description">Native Android Client untuk E-Learning Universitas Bina Sarana Informatika (BSI). Aplikasi ini memudahkan mahasiswa untuk mengakses jadwal kuliah, melakukan presensi, dan mengelola profil akademik.</string>
@@ -162,4 +222,27 @@
     <string name="status_no">No</string>
     <string name="kelas_hari_ini">Kelas Hari Ini</string>
     <string name="no_class_today">Tidak ada kelas hari ini</string>
+    <string name="is_today_holiday">Hari Ini Libur?</string>
+    <string name="validate_manual">*validasi manual</string>
+
+    <!-- Profile -->
+    <string name="status_active">Aktif</string>
+    <string name="personal_info">Informasi Pribadi</string>
+    <string name="edit">Edit</string>
+    <string name="name_label">Nama</string>
+    <string name="email_label">Email</string>
+    <string name="change_password">Ubah Password</string>
+    <string name="app_version">MyBest UBSI v1.0.0</string>
+    <string name="copyright">© 2025 risunCode</string>
+    <string name="guest_user">Guest User</string>
+    <string name="default_nim">00000000</string>
+    <string name="default_email">guest@students.ubsi.ac.id</string>
+
+    <!-- Jadwal -->
+    <string name="matkul_label">Mata Kuliah</string>
+
+    <!-- Setup -->
+    <string name="enlarge">Perbesar</string>
+    <string name="scroll_to_continue">Baca untuk melanjutkan (gulir/scroll)</string>
+    <string name="about_app">Tentang Aplikasi</string>
 </resources>

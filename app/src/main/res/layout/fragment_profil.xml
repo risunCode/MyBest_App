@@ -72,7 +72,7 @@
                     android:background="@drawable/bg_status_active"
                     android:paddingHorizontal="12dp"
                     android:paddingVertical="4dp"
-                    android:text="Aktif"
+                    android:text="@string/status_active"
                     android:textColor="@color/text_white"
                     android:textSize="12sp"
                     android:textStyle="bold" />
@@ -106,7 +106,7 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="Informasi Pribadi"
+                        android:text="@string/personal_info"
                         android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:textStyle="bold" />
@@ -131,7 +131,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_marginStart="6dp"
-                            android:text="Edit"
+                            android:text="@string/edit"
                             android:textColor="@color/primary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
@@ -163,7 +163,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Nama"
+                            android:text="@string/name_label"
                             android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
 
@@ -203,7 +203,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Email"
+                            android:text="@string/email_label"
                             android:textColor="@color/text_secondary"
                             android:textSize="12sp" />
 
@@ -242,7 +242,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Ubah Password"
+                    android:text="@string/change_password"
                     android:textColor="@color/text_primary"
                     android:textSize="16sp"
                     android:textStyle="bold"
@@ -316,7 +316,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="48dp"
                     android:background="@drawable/bg_button_red"
-                    android:text="Ubah Password"
+                    android:text="@string/change_password"
                     android:textColor="@color/text_white"
                     android:textSize="14sp"
                     android:textStyle="bold" />
@@ -335,7 +335,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="MyBest UBSI v1.0.0"
+                android:text="@string/app_version"
                 android:textColor="@color/text_secondary"
                 android:textSize="14sp" />
 
@@ -343,7 +343,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="© 2025 risunCode"
+                android:text="@string/copyright"
                 android:textColor="@color/text_secondary"
                 android:textSize="12sp" />
 

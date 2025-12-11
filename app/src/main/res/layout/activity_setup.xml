@@ -267,7 +267,7 @@
                     style="@style/Widget.MaterialComponents.Button.TextButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Perbesar"
+                    android:text="@string/enlarge"
                     android:textSize="12sp"
                     android:textColor="@color/primary" />
             </LinearLayout>
@@ -278,7 +278,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:gravity="center"
-                android:text="Baca untuk melanjutkan (gulir/scroll)"
+                android:text="@string/scroll_to_continue"
                 android:textColor="@color/primary"
                 android:textSize="12sp"
                 android:textStyle="bold" />
@@ -311,7 +311,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Tentang Aplikasi"
+                            android:text="@string/about_app"
                             android:textColor="@color/text_primary"
                             android:textSize="14sp"
                             android:textStyle="bold" />
