@@ -387,6 +387,101 @@ class ApiService {
         }
     }
     
+    /**
+     * Update profile (name and email)
+     * POST /foto-profil/update
+     */
+    suspend fun updateProfile(name: String, email: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // First get CSRF token from profile page
+            val profileHtml = getPageHtml("/profil")
+                ?: return@withContext Result.failure(IOException("Failed to get profile page"))
+            
+            if (HtmlParser.isLoginPage(profileHtml)) {
+                return@withContext Result.failure(SessionExpiredException())
+            }
+            
+            val csrfToken = HtmlParser.extractCsrfToken(profileHtml)
+                ?: return@withContext Result.failure(IOException("CSRF token not found"))
+            
+            val formBody = FormBody.Builder()
+                .add("_method", "patch")
+                .add("_token", csrfToken)
+                .add("name", name)
+                .add("email", email)
+                .build()
+            
+            val request = Request.Builder()
+                .url(ApiClient.buildUrl("/foto-profil/update"))
+                .post(formBody)
+                .header("Referer", ApiClient.buildUrl("/profil"))
+                .header("X-CSRF-TOKEN", csrfToken)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            response.close()
+            
+            if (response.code in 200..302) {
+                Result.success(Unit)
+            } else {
+                Result.failure(IOException("Failed to update profile: ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Change password
+     * POST /profil/update
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> = withContext(Dispatchers.IO) {
+        try {
+            // First get CSRF token from profile page
+            val profileHtml = getPageHtml("/profil")
+                ?: return@withContext Result.failure(IOException("Failed to get profile page"))
+            
+            if (HtmlParser.isLoginPage(profileHtml)) {
+                return@withContext Result.failure(SessionExpiredException())
+            }
+            
+            val csrfToken = HtmlParser.extractCsrfToken(profileHtml)
+                ?: return@withContext Result.failure(IOException("CSRF token not found"))
+            
+            val formBody = FormBody.Builder()
+                .add("_method", "patch")
+                .add("_token", csrfToken)
+                .add("current_password", currentPassword)
+                .add("password", newPassword)
+                .add("password_confirmation", newPassword)
+                .build()
+            
+            val request = Request.Builder()
+                .url(ApiClient.buildUrl("/profil/update"))
+                .post(formBody)
+                .header("Referer", ApiClient.buildUrl("/profil"))
+                .header("X-CSRF-TOKEN", csrfToken)
+                .build()
+            
+            val response = client.newCall(request).execute()
+            val html = response.body?.string()
+            response.close()
+            
+            // Check for errors in response
+            if (html != null && html.contains("error", ignoreCase = true)) {
+                return@withContext Result.failure(IOException("Password change failed - check current password"))
+            }
+            
+            if (response.code in 200..302) {
+                Result.success(Unit)
+            } else {
+                Result.failure(IOException("Failed to change password: ${response.code}"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
     // ========== HELPER ==========
     
     /**

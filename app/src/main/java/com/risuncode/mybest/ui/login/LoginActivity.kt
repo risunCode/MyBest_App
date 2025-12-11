@@ -151,8 +151,8 @@ class LoginActivity : AppCompatActivity() {
                 prefManager.isLoggedIn = true
                 prefManager.userName = nim
                 
-                // Sync schedule in background
-                repository.syncScheduleFromServer()
+                // Navigate immediately, sync in background (non-blocking)
+                navigateToMain()
                 
                 Toast.makeText(
                     this@LoginActivity, 
@@ -160,7 +160,11 @@ class LoginActivity : AppCompatActivity() {
                     Toast.LENGTH_SHORT
                 ).show()
                 
-                navigateToMain()
+                // Fire-and-forget background sync
+                kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    repository.syncScheduleFromServer()
+                    repository.syncUserFromServer()
+                }
             }.onFailure { error ->
                 showLoading(false)
                 setInputsEnabled(true)

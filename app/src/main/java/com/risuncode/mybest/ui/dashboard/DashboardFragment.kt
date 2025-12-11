@@ -95,16 +95,14 @@ class DashboardFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             showSkeleton()
             
-            // Sync from server if not guest mode
-            if (!prefManager.isGuestMode) {
-                val result = repository.syncScheduleFromServer()
-                result.onFailure { error ->
-                    android.widget.Toast.makeText(
-                        requireContext(),
-                        error.message ?: "Gagal sinkronisasi",
-                        android.widget.Toast.LENGTH_SHORT
-                    ).show()
-                }
+            // Always sync from server
+            val result = repository.syncScheduleFromServer()
+            result.onFailure { error ->
+                android.widget.Toast.makeText(
+                    requireContext(),
+                    error.message ?: "Gagal sinkronisasi",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
             }
             
             setupUI()
@@ -171,7 +169,7 @@ class DashboardFragment : Fragment() {
 
     private fun loadAppStatus() {
         // Login Status - check if we have valid user data
-        val isLoggedIn = prefManager.isLoggedIn || prefManager.isGuestMode
+        val isLoggedIn = prefManager.isLoggedIn
         binding.tvLoginStatus.text = if (isLoggedIn) getString(R.string.status_valid) else getString(R.string.status_invalid)
         binding.tvLoginStatus.setBackgroundResource(R.drawable.bg_status_badge)
         binding.tvLoginStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(

@@ -100,11 +100,22 @@ class ProfilFragment : Fragment() {
                 Toast.makeText(requireContext(), getString(R.string.error_password_min_length), Toast.LENGTH_SHORT).show()
             }
             else -> {
-                // TODO: Implement actual password change via API
-                binding.etCurrentPassword.text?.clear()
-                binding.etNewPassword.text?.clear()
-                binding.etConfirmPassword.text?.clear()
-                Toast.makeText(requireContext(), getString(R.string.password_changed_success), Toast.LENGTH_SHORT).show()
+                binding.btnChangePassword.isEnabled = false
+                
+                viewLifecycleOwner.lifecycleScope.launch {
+                    val result = repository.changePassword(currentPassword, newPassword)
+                    
+                    result.onSuccess {
+                        binding.etCurrentPassword.text?.clear()
+                        binding.etNewPassword.text?.clear()
+                        binding.etConfirmPassword.text?.clear()
+                        Toast.makeText(requireContext(), getString(R.string.password_changed_success), Toast.LENGTH_SHORT).show()
+                    }.onFailure { error ->
+                        Toast.makeText(requireContext(), "Gagal: ${error.message}", Toast.LENGTH_SHORT).show()
+                    }
+                    
+                    binding.btnChangePassword.isEnabled = true
+                }
             }
         }
     }

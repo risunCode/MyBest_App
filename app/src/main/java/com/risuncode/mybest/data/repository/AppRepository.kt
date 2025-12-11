@@ -199,6 +199,20 @@ class AppRepository(private val database: AppDatabase) {
         return apiService.submitAssignment(formData, link)
     }
     
+    /**
+     * Update user profile
+     */
+    suspend fun updateProfile(name: String, email: String): Result<Unit> {
+        return apiService.updateProfile(name, email)
+    }
+    
+    /**
+     * Change password
+     */
+    suspend fun changePassword(currentPassword: String, newPassword: String): Result<Unit> {
+        return apiService.changePassword(currentPassword, newPassword)
+    }
+    
     // ==================== USER (LOCAL) ====================
     
     fun getCurrentUser(): Flow<UserEntity?> = userDao.getCurrentUser()

@@ -132,8 +132,7 @@ class PresensiActivity : AppCompatActivity() {
 
     private fun loadAttendanceRecords(encryptedId: String) {
         if (encryptedId.isEmpty()) {
-            // No encrypted ID - use dummy data
-            generateDummyAttendanceList()
+            showEmptyAttendanceState("Data tidak tersedia")
             return
         }
         
@@ -144,7 +143,7 @@ class PresensiActivity : AppCompatActivity() {
                 if (records.isNotEmpty()) {
                     populateAttendanceList(records)
                 } else {
-                    generateDummyAttendanceList()
+                    showEmptyAttendanceState("Belum ada data presensi")
                 }
             }.onFailure { error ->
                 if (error is SessionExpiredException) {
@@ -152,10 +151,10 @@ class PresensiActivity : AppCompatActivity() {
                 } else {
                     Toast.makeText(
                         this@PresensiActivity,
-                        "Gagal memuat data presensi",
+                        "Gagal memuat data presensi: ${error.message}",
                         Toast.LENGTH_SHORT
                     ).show()
-                    generateDummyAttendanceList()
+                    showEmptyAttendanceState("Gagal memuat data")
                 }
             }
         }
@@ -212,90 +211,13 @@ class PresensiActivity : AppCompatActivity() {
         
         updateAttendanceUI()
     }
-
-    private fun generateDummyAttendanceList() {
-        val container = binding.attendanceListContainer
-        container.removeAllViews()
-
-        data class DummyRecord(
-            val ptm: Int,
-            val date: String,
-            val isHadir: Boolean,
-            val rangkuman: String,
-            val beritaAcara: String
-        )
-
-        val dummyRecords = listOf(
-            DummyRecord(1, "2025-09-22", true, 
-                "Pengantar Keamanan dan Penjaminan Informasi",
-                "Membahas tentang Konsep dan prinsip dasar informasi"),
-            DummyRecord(2, "2025-09-29", true,
-                "Ancaman dan Serangan Keamanan Informasi",
-                "Mempelajari berbagai jenis ancaman keamanan"),
-            DummyRecord(3, "2025-10-06", true,
-                "Kriptografi Dasar",
-                "Pengenalan kriptografi dan algoritma enkripsi"),
-            DummyRecord(4, "2025-10-13", true,
-                "Keamanan Jaringan",
-                "Arsitektur keamanan jaringan dan Firewall"),
-            DummyRecord(5, "2025-10-20", false,
-                "Manajemen Akses dan Identitas",
-                "Autentikasi dan otorisasi"),
-            DummyRecord(6, "2025-10-27", true,
-                "Keamanan Aplikasi Web",
-                "OWASP Top 10 dan SQL Injection"),
-            DummyRecord(7, "2025-11-03", true,
-                "Audit dan Compliance",
-                "Standar keamanan ISO 27001"),
-            DummyRecord(8, "2025-11-10", true,
-                "Incident Response",
-                "Proses penanganan insiden")
-        )
-
-        hadirCount = dummyRecords.count { it.isHadir }
-        tidakHadirCount = dummyRecords.count { !it.isHadir }
-
-        for (record in dummyRecords) {
-            val itemView = LayoutInflater.from(this)
-                .inflate(R.layout.item_attendance_expandable, container, false)
-
-            val tvNumber = itemView.findViewById<TextView>(R.id.tvNumber)
-            val tvStatus = itemView.findViewById<TextView>(R.id.tvStatus)
-            val tvDate = itemView.findViewById<TextView>(R.id.tvDate)
-            val tvPtm = itemView.findViewById<TextView>(R.id.tvPtm)
-            val ivExpand = itemView.findViewById<ImageView>(R.id.ivExpand)
-            val rowMain = itemView.findViewById<LinearLayout>(R.id.rowMain)
-            val expandableContent = itemView.findViewById<LinearLayout>(R.id.expandableContent)
-            val tvRangkuman = itemView.findViewById<TextView>(R.id.tvRangkuman)
-            val tvBeritaAcara = itemView.findViewById<TextView>(R.id.tvBeritaAcara)
-
-            tvNumber.text = record.ptm.toString()
-            tvDate.text = record.date
-            tvPtm.text = record.ptm.toString()
-            tvRangkuman.text = record.rangkuman
-            tvBeritaAcara.text = record.beritaAcara
-
-            // Set status badge
-            if (record.isHadir) {
-                tvStatus.text = getString(R.string.status_hadir)
-                tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                    ContextCompat.getColor(this, R.color.status_success)
-                )
-            } else {
-                tvStatus.text = getString(R.string.status_tidak_hadir)
-                tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
-                    ContextCompat.getColor(this, R.color.status_error)
-                )
-            }
-
-            rowMain.setOnClickListener {
-                toggleExpand(expandableContent, ivExpand)
-            }
-
-            container.addView(itemView)
-        }
-        
+    
+    private fun showEmptyAttendanceState(message: String) {
+        binding.attendanceListContainer.removeAllViews()
+        hadirCount = 0
+        tidakHadirCount = 0
         updateAttendanceUI()
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
     
     private fun toggleExpand(expandableContent: View, ivExpand: ImageView) {
@@ -332,12 +254,6 @@ class PresensiActivity : AppCompatActivity() {
 
     private fun performPresensi() {
         val s = schedule ?: return
-        
-        if (prefManager.isGuestMode) {
-            // Guest mode - simulate success
-            simulatePresensiSuccess()
-            return
-        }
         
         if (s.encryptedId.isEmpty()) {
             Toast.makeText(this, "Data presensi tidak tersedia", Toast.LENGTH_SHORT).show()
@@ -386,29 +302,6 @@ class PresensiActivity : AppCompatActivity() {
                     binding.btnPresensi.isEnabled = true
                     binding.btnPresensi.text = getString(R.string.presensi_start)
                 }
-            }
-        }
-    }
-    
-    private fun simulatePresensiSuccess() {
-        binding.btnPresensi.isEnabled = false
-        binding.btnPresensi.text = getString(R.string.processing)
-        
-        lifecycleScope.launch {
-            kotlinx.coroutines.delay(1500)
-            
-            schedule?.let { s ->
-                repository.updateAttendance(s.id, true, System.currentTimeMillis())
-                hadirCount++
-                updateAttendanceUI()
-                updateLastResponse(200)
-                
-                showResponseDialog(
-                    title = getString(R.string.presensi_success),
-                    message = getString(R.string.response_200_ok),
-                    isSuccess = true
-                )
-                binding.btnPresensi.text = getString(R.string.presensi_already)
             }
         }
     }
