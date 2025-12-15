@@ -18,6 +18,7 @@ import androidx.transition.AutoTransition
 import androidx.transition.TransitionManager
 import com.risuncode.mybest.databinding.ActivitySetupBinding
 import com.risuncode.mybest.ui.login.LoginActivity
+import com.risuncode.mybest.ui.main.MainActivity
 import com.risuncode.mybest.util.PreferenceManager
 
 class SetupActivity : AppCompatActivity() {
@@ -45,7 +46,13 @@ class SetupActivity : AppCompatActivity() {
         
         // Skip setup if already completed
         if (prefManager.isSetupCompleted) {
-            navigateToLogin()
+            // Check if has any login state or credentials -> go to Dashboard
+            val hasCredentials = prefManager.savedNim.isNotEmpty() && prefManager.savedPassword.isNotEmpty()
+            if (prefManager.isLoggedIn || prefManager.autoLoginEnabled || hasCredentials) {
+                navigateToMain()
+            } else {
+                navigateToLogin()
+            }
             return
         }
         
@@ -191,6 +198,11 @@ class SetupActivity : AppCompatActivity() {
 
     private fun navigateToLogin() {
         startActivity(Intent(this, LoginActivity::class.java))
+        finish()
+    }
+    
+    private fun navigateToMain() {
+        startActivity(Intent(this, MainActivity::class.java))
         finish()
     }
 

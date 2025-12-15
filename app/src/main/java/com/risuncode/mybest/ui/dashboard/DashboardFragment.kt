@@ -19,6 +19,7 @@ import com.risuncode.mybest.data.entity.ScheduleEntity
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.FragmentDashboardBinding
 import com.risuncode.mybest.ui.presensi.PresensiActivity
+import com.risuncode.mybest.util.DateUtils
 import com.risuncode.mybest.util.PreferenceManager
 import com.risuncode.mybest.util.StringUtils
 import kotlinx.coroutines.flow.firstOrNull
@@ -32,6 +33,9 @@ class DashboardFragment : Fragment() {
     
     private lateinit var prefManager: PreferenceManager
     private lateinit var repository: AppRepository
+    
+    // Prevent redundant API calls when switching tabs
+    private var isDataLoaded = false
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -51,16 +55,79 @@ class DashboardFragment : Fragment() {
         
         setupSwipeRefresh()
         
-        // Only show skeleton on first load, not when returning from other fragments
-        if (savedInstanceState == null && !isDataLoaded) {
-            showSkeleton()
-            loadDataWithSkeleton()
-        } else {
-            setupUI()
+        // Only load data once - skip on tab switches
+        if (!isDataLoaded) {
+            checkSessionAndLoad()
         }
     }
-
-    private var isDataLoaded = false
+    
+    /**
+     * Check if session is valid. If expired, perform auto-relogin and reload data.
+     * If valid, just load data normally.
+     */
+    private fun checkSessionAndLoad() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            // First, display cached data immediately (if available)
+            setupUI()
+            
+            // Check cache validity (1 minute)
+            val lastSync = prefManager.lastSyncTime
+            val now = System.currentTimeMillis()
+            val CACHE_DURATION = 60 * 1000 // 1 minute
+            
+            // If data is fresh enough, skip network check
+            if (now - lastSync < CACHE_DURATION) {
+                // Mark as loaded
+                isDataLoaded = true
+                return@launch
+            }
+            
+            // Then check session in background
+            val isSessionValid = repository.checkSession()
+            
+            if (!isSessionValid) {
+                // Session expired - try auto-relogin
+                val nim = prefManager.savedNim
+                val password = prefManager.savedPassword
+                
+                if (nim.isNotEmpty() && password.isNotEmpty()) {
+                    // Perform auto-relogin silently
+                    android.widget.Toast.makeText(
+                        requireContext(),
+                        "Sesi berakhir, melakukan auto-login...",
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                    
+                    val loginResult = repository.performLogin(nim, password)
+                    
+                    loginResult.onSuccess {
+                        // Refresh data after successful relogin
+                        repository.syncScheduleFromServer()
+                        prefManager.lastSyncTime = System.currentTimeMillis() // Update access time
+                        setupUI()
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "Auto-login berhasil",
+                            android.widget.Toast.LENGTH_SHORT
+                        ).show()
+                    }.onFailure { error ->
+                        // Auto-login failed - notify user
+                        android.widget.Toast.makeText(
+                            requireContext(),
+                            "Auto-login gagal: ${error.message}",
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            } else {
+                // Session valid - update access time
+                prefManager.lastSyncTime = System.currentTimeMillis()
+            }
+            
+            // Mark as loaded to prevent redundant calls on tab switch
+            isDataLoaded = true
+        }
+    }
 
     private fun setupSwipeRefresh() {
         binding.swipeRefresh.setColorSchemeResources(R.color.primary)
@@ -69,33 +136,11 @@ class DashboardFragment : Fragment() {
         }
     }
 
-    private fun showSkeleton() {
-        binding.skeletonLayout.shimmerLayout.visibility = View.VISIBLE
-        binding.skeletonLayout.shimmerLayout.startShimmer()
-        binding.contentScrollView.visibility = View.GONE
-    }
 
-    private fun hideSkeleton() {
-        binding.skeletonLayout.shimmerLayout.stopShimmer()
-        binding.skeletonLayout.shimmerLayout.visibility = View.GONE
-        binding.contentScrollView.visibility = View.VISIBLE
-    }
-
-    private fun loadDataWithSkeleton() {
-        viewLifecycleOwner.lifecycleScope.launch {
-            // Small delay for skeleton to be visible
-            kotlinx.coroutines.delay(800)
-            setupUI()
-            hideSkeleton()
-            isDataLoaded = true
-        }
-    }
 
     private fun refreshData() {
         viewLifecycleOwner.lifecycleScope.launch {
-            showSkeleton()
-            
-            // Always sync from server
+            // Sync from server using swipe refresh indicator
             val result = repository.syncScheduleFromServer()
             result.onFailure { error ->
                 android.widget.Toast.makeText(
@@ -106,7 +151,6 @@ class DashboardFragment : Fragment() {
             }
             
             setupUI()
-            hideSkeleton()
             binding.swipeRefresh.isRefreshing = false
         }
     }
@@ -310,22 +354,10 @@ class DashboardFragment : Fragment() {
     }
     
     private fun getTodaySchedules(schedules: List<ScheduleEntity>): List<ScheduleEntity> {
-        val today = getCurrentDayInIndonesian()
+        val today = DateUtils.getCurrentDayInIndonesian()
         return schedules.filter { it.day.equals(today, ignoreCase = true) }
     }
     
-    private fun getCurrentDayInIndonesian(): String {
-        val calendar = Calendar.getInstance()
-        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY -> "Senin"
-            Calendar.TUESDAY -> "Selasa"
-            Calendar.WEDNESDAY -> "Rabu"
-            Calendar.THURSDAY -> "Kamis"
-            Calendar.FRIDAY -> "Jumat"
-            Calendar.SATURDAY -> "Sabtu"
-            Calendar.SUNDAY -> "Minggu"
-            else -> "Senin"
-        }
-    }
+
 }
 

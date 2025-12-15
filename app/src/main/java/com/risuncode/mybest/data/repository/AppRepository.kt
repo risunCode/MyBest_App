@@ -1,11 +1,13 @@
 package com.risuncode.mybest.data.repository
 
 import com.risuncode.mybest.data.AppDatabase
+import com.risuncode.mybest.data.api.AlreadyLoggedException
 import com.risuncode.mybest.data.api.ApiService
 import com.risuncode.mybest.data.api.AttendanceFormData
 import com.risuncode.mybest.data.api.AttendanceRecord
 import com.risuncode.mybest.data.api.AttendanceResult
 import com.risuncode.mybest.data.api.ParsedAssignment
+import com.risuncode.mybest.data.api.ParsedAssignmentGrade
 import com.risuncode.mybest.data.api.ParsedCourse
 import com.risuncode.mybest.data.entity.NotificationEntity
 import com.risuncode.mybest.data.entity.ScheduleEntity
@@ -33,6 +35,16 @@ class AppRepository(private val database: AppDatabase) {
     suspend fun performLogin(nim: String, password: String): Result<Unit> {
         // 1. Get login page with CSRF and captcha
         val loginPageResult = apiService.getLoginPage()
+        
+        // Check if already logged in (AlreadyLoggedException)
+        loginPageResult.onFailure { error ->
+            if (error is AlreadyLoggedException) {
+                // Already logged in - just sync user data and return success
+                syncUserFromServer(nim)
+                return Result.success(Unit)
+            }
+        }
+        
         val loginPage = loginPageResult.getOrElse { 
             return Result.failure(it) 
         }
@@ -49,8 +61,8 @@ class AppRepository(private val database: AppDatabase) {
             return Result.failure(it) 
         }
         
-        // 3. Sync user data from profile
-        syncUserFromServer()
+        // 3. Sync user data from profile with NIM
+        syncUserFromServer(nim)
         
         return Result.success(Unit)
     }
@@ -94,16 +106,17 @@ class AppRepository(private val database: AppDatabase) {
     
     /**
      * Sync user profile from server
+     * @param nim The NIM to associate with this user (from login or preferences)
      */
-    suspend fun syncUserFromServer(): Result<UserEntity> {
+    suspend fun syncUserFromServer(nim: String = ""): Result<UserEntity> {
         val result = apiService.getProfile()
         val profile = result.getOrElse { 
             return Result.failure(it) 
         }
         
-        // Create or update user entity (nim is primary key)
+        // Create or update user entity with NIM
         val userEntity = UserEntity(
-            nim = "", // Will be filled from preferences
+            nim = nim,
             name = profile.name,
             email = profile.email,
             prodi = "",
@@ -147,9 +160,18 @@ class AppRepository(private val database: AppDatabase) {
     
     /**
      * Get assignments for a course
+     * @param tugasLink The tugas link from schedule (e.g., "/tugas/xxx")
      */
-    suspend fun getAssignments(encryptedCourseId: String): Result<List<ParsedAssignment>> {
-        return apiService.getAssignments(encryptedCourseId)
+    suspend fun getAssignments(tugasLink: String): Result<List<ParsedAssignment>> {
+        return apiService.getAssignments(tugasLink)
+    }
+    
+    /**
+     * Get assignment grades for a course
+     * @param tugasLink The tugas link from schedule (e.g., "/tugas/xxx")
+     */
+    suspend fun getAssignmentGrades(tugasLink: String): Result<List<ParsedAssignmentGrade>> {
+        return apiService.getAssignmentGrades(tugasLink)
     }
     
     /**
@@ -234,6 +256,14 @@ class AppRepository(private val database: AppDatabase) {
     
     suspend fun getUpcomingSchedule(): Result<ScheduleEntity?> = runCatching {
         scheduleDao.getUpcomingSchedule()
+    }
+    
+    suspend fun getScheduleById(id: Int): ScheduleEntity? {
+        return try {
+            scheduleDao.getScheduleById(id)
+        } catch (e: Exception) {
+            null
+        }
     }
     
     suspend fun getScheduleCount(): Int = try {

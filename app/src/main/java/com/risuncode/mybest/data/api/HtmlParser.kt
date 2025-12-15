@@ -28,45 +28,73 @@ object HtmlParser {
     
     /**
      * Extract captcha question dari HTML (format: "Berapa hasil dari X + Y?")
+     * Multiple patterns with fallback for BSI page variations
      */
     fun extractCaptchaQuestion(html: String): String? {
-        val regex = """Berapa hasil dari\s*(\d+\s*[+\-*/×÷xX]\s*\d+)""".toRegex()
-        return regex.find(html)?.groupValues?.get(1)
+        val patterns = listOf(
+            """Berapa hasil dari\s*(\d+\s*[+\-*/×÷xX]\s*\d+)""".toRegex(RegexOption.IGNORE_CASE),
+            """(\d+\s*[+\-*/×÷xX]\s*\d+)\s*\?""".toRegex()
+        )
+        
+        for (pattern in patterns) {
+            pattern.find(html)?.let { match ->
+                return match.groupValues.getOrNull(1) ?: match.value
+            }
+        }
+        
+        // Fallback: find any math expression in the HTML
+        val mathPattern = """(\d+)\s*([+\-*/×÷xX])\s*(\d+)""".toRegex()
+        return mathPattern.find(html)?.value
     }
     
     /**
      * Solve captcha math question
+     * Returns null if cannot parse (instead of 0 to avoid login issues)
      */
-    fun solveCaptcha(question: String): Int {
-        val cleanQuestion = question.replace(" ", "")
+    fun solveCaptcha(question: String): Int? {
+        val normalized = question
+            .replace("×", "*")
+            .replace("x", "*", ignoreCase = true)
+            .replace("÷", "/")
+            .replace(":", "/")
+            .replace(" ", "")
         
-        // Find operator
-        val operatorMatch = Regex("[+\\-*/×÷xX]").find(cleanQuestion)
-        val operator = operatorMatch?.value ?: return 0
+        val match = """(\d+)\s*([+\-*/])\s*(\d+)""".toRegex().find(normalized)
+            ?: return null
         
-        val parts = cleanQuestion.split(Regex("[+\\-*/×÷xX]"))
-        if (parts.size != 2) return 0
+        val (_, num1, operator, num2) = match.groupValues
+        val a = num1.toIntOrNull() ?: return null
+        val b = num2.toIntOrNull() ?: return null
         
-        val a = parts[0].toIntOrNull() ?: return 0
-        val b = parts[1].toIntOrNull() ?: return 0
-        
-        return when (operator.lowercase()) {
+        return when (operator) {
             "+" -> a + b
             "-" -> a - b
-            "*", "×", "x" -> a * b
-            "/", "÷" -> if (b != 0) a / b else 0
-            else -> 0
+            "*" -> a * b
+            "/" -> if (b != 0) a / b else null
+            else -> null
         }
     }
     
     /**
-     * Check if HTML is login page
+     * Check if HTML is login page (session expired)
+     * Stricter detection to avoid false positives
      */
     fun isLoginPage(html: String): Boolean {
         val doc = Jsoup.parse(html)
+        
+        // Login page MUST have username input - key differentiator
         val hasUsernameInput = doc.select("input[name=username]").isNotEmpty()
-        val hasCaptcha = html.contains("Berapa hasil", ignoreCase = true)
-        return hasUsernameInput || hasCaptcha
+        if (!hasUsernameInput) {
+            return false // Not a login page if no username field
+        }
+        
+        // Additional checks: password or captcha must also exist
+        val hasPasswordInput = doc.select("input[name=password]").isNotEmpty()
+        val hasCaptcha = doc.select("input[name=captcha_answer]").isNotEmpty() || 
+                         html.contains("Berapa hasil", ignoreCase = true)
+        
+        // Must have username + (password or captcha) to be login page
+        return hasUsernameInput && (hasPasswordInput || hasCaptcha)
     }
     
     /**
@@ -83,6 +111,33 @@ object HtmlParser {
         return null
     }
     
+    /**
+     * Extract error message from HTML response
+     */
+    fun extractErrorMessage(html: String, defaultMessage: String = "Terjadi kesalahan"): String {
+        val doc = Jsoup.parse(html)
+        
+        // Try various error selectors
+        doc.select(".alert-danger").text().takeIf { it.isNotEmpty() }?.let { return it }
+        doc.select(".text-danger").text().takeIf { it.isNotEmpty() }?.let { return it }
+        doc.select(".error").text().takeIf { it.isNotEmpty() }?.let { return it }
+        
+        return defaultMessage
+    }
+    
+    /**
+     * Extract success message from HTML response
+     */
+    fun extractSuccessMessage(html: String): String? {
+        val doc = Jsoup.parse(html)
+        
+        doc.select(".alert-success").text().takeIf { it.isNotEmpty() }?.let { return it }
+        doc.select(".text-success").text().takeIf { it.isNotEmpty() }?.let { return it }
+        doc.select(".success").text().takeIf { it.isNotEmpty() }?.let { return it }
+        
+        return null
+    }
+    
     // ========== SCHEDULE ==========
     
     /**
@@ -94,92 +149,124 @@ object HtmlParser {
         
         doc.select(".pricing-plan").forEach { card ->
             try {
-                val name = card.select(".pricing-title").text()
-                val scheduleText = card.select(".pricing-save").text() // "Senin - 08:00-10:30"
+                val name = card.select(".pricing-title").text().trim()
+                val scheduleText = card.select(".pricing-save").text().trim()
                 
-                // Parse day and time
-                // Format: "Senin - 08:00-10:30" OR "Senin, 08:00 - 10:30"
-                var day = ""
-                var jamMasuk = ""
-                var jamKeluar = ""
+                // Parse day and time using regex patterns
+                // Formats: "Senin, 08:00 - 10:30" OR "Senin - 08:00-10:30"
+                val commaRegex = """(\w+),\s*(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})""".toRegex()
+                val dashRegex = """(\w+)\s*-\s*(\d{2}:\d{2})-(\d{2}:\d{2})""".toRegex()
                 
-                // Try Regex first (for "Day, HH:mm - HH:mm" format)
-                val regex = """([A-Za-z]+),\s*(\d{2}:\d{2})\s*-\s*(\d{2}:\d{2})""".toRegex()
-                val match = regex.find(scheduleText)
-                
-                if (match != null) {
-                    day = match.groupValues[1]
-                    jamMasuk = match.groupValues[2]
-                    jamKeluar = match.groupValues[3]
-                } else {
-                    // Fallback to old split method
-                    val scheduleParts = scheduleText.split(" - ")
-                    day = scheduleParts.getOrNull(0) ?: ""
-                    val timeParts = scheduleParts.getOrNull(1)?.split("-") ?: listOf("", "")
-                    jamMasuk = timeParts.getOrNull(0)?.trim() ?: ""
-                    jamKeluar = timeParts.getOrNull(1)?.trim() ?: ""
-                }
-                
-                // Parse body details
-                val styledItems = card.select(".styled")
-                var kodeDosen = ""
-                var kodeMtk = ""
-                var sks = 0
-                var noRuang = ""
-                var kelPraktek = ""
-                var kodeGabung = ""
-                
-                styledItems.forEach { item ->
-                    val text = item.text()
-                    when {
-                        text.contains("Kode Dosen:", ignoreCase = true) -> 
-                            kodeDosen = text.substringAfter(":").trim()
-                        text.contains("Kode MTK:", ignoreCase = true) -> 
-                            kodeMtk = text.substringAfter(":").trim()
-                        text.contains("SKS:", ignoreCase = true) -> 
-                            sks = text.substringAfter(":").trim().toIntOrNull() ?: 0
-                        text.contains("No Ruang:", ignoreCase = true) -> 
-                            noRuang = text.substringAfter(":").trim()
-                        text.contains("Kel Praktek:", ignoreCase = true) -> 
-                            kelPraktek = text.substringAfter(":").trim()
-                        text.contains("Kode Gabung:", ignoreCase = true) -> 
-                            kodeGabung = text.substringAfter(":").trim()
+                val (day, jamMasuk, jamKeluar) = when {
+                    commaRegex.find(scheduleText) != null -> {
+                        val match = commaRegex.find(scheduleText)!!
+                        Triple(match.groupValues[1], match.groupValues[2], match.groupValues[3])
+                    }
+                    dashRegex.find(scheduleText) != null -> {
+                        val match = dashRegex.find(scheduleText)!!
+                        Triple(match.groupValues[1], match.groupValues[2], match.groupValues[3])
+                    }
+                    else -> {
+                        // Final fallback: split method
+                        val scheduleParts = scheduleText.split(" - ")
+                        val timeParts = scheduleParts.getOrNull(1)?.split("-") ?: listOf("", "")
+                        Triple(
+                            scheduleParts.getOrNull(0)?.trim() ?: "",
+                            timeParts.getOrNull(0)?.trim() ?: "",
+                            timeParts.getOrNull(1)?.trim() ?: ""
+                        )
                     }
                 }
+                
+                // Parse body details using extractCourseInfo helper
+                val cardBody = card.select(".card-body")
+                val kodeDosen = extractCourseInfo(cardBody, "Kode Dosen")
+                val kodeMtk = extractCourseInfo(cardBody, "Kode MTK")
+                val sks = extractCourseInfo(cardBody, "SKS").toIntOrNull() ?: 0
+                val noRuang = extractCourseInfo(cardBody, "No Ruang")
+                val kelPraktek = extractCourseInfo(cardBody, "Kel Praktek")
+                val kodeGabung = extractCourseInfo(cardBody, "Kode Gabung")
                 
                 // Parse links
                 val footer = card.select(".pricing-footer")
                 val masukKelasLink = footer.select("a.btn-primary").attr("href")
-                val diskusiLink = footer.select("a:contains(Diskusi)").attr("href")
-                val materiLink = footer.select("a:contains(Materi)").attr("href")
-                val tugasLink = footer.select("a:contains(Tugas)").attr("href")
+                    .ifEmpty { footer.select("a[href*=absen-mhs]").attr("href") }
+                val diskusiLink = footer.select("a[title=Ruang Diskusi]").attr("href")
+                    .ifEmpty { footer.select("a:contains(Diskusi)").attr("href") }
+                val materiLink = footer.select("a[title=Ruang Materi]").attr("href")
+                    .ifEmpty { footer.select("a:contains(Materi)").attr("href") }
+                val tugasLink = footer.select("a[title=Ruang Tugas]").attr("href")
+                    .ifEmpty { footer.select("a:contains(Tugas)").attr("href") }
                 
                 // Extract encrypted ID from masukKelas link
                 val encryptedId = masukKelasLink.substringAfterLast("/")
                 
-                courses.add(ParsedCourse(
-                    encryptedId = encryptedId,
-                    name = name,
-                    day = day,
-                    jamMasuk = jamMasuk,
-                    jamKeluar = jamKeluar,
-                    kodeDosen = kodeDosen,
-                    kodeMtk = kodeMtk,
-                    sks = sks,
-                    noRuang = noRuang,
-                    kelPraktek = kelPraktek,
-                    kodeGabung = kodeGabung,
-                    masukKelasLink = masukKelasLink,
-                    diskusiLink = diskusiLink,
-                    materiLink = materiLink,
-                    tugasLink = tugasLink
-                ))
+                if (name.isNotEmpty()) {
+                    courses.add(ParsedCourse(
+                        encryptedId = encryptedId,
+                        name = name,
+                        day = day,
+                        jamMasuk = jamMasuk,
+                        jamKeluar = jamKeluar,
+                        kodeDosen = kodeDosen,
+                        kodeMtk = kodeMtk,
+                        sks = sks,
+                        noRuang = noRuang,
+                        kelPraktek = kelPraktek,
+                        kodeGabung = kodeGabung,
+                        masukKelasLink = masukKelasLink,
+                        diskusiLink = diskusiLink,
+                        materiLink = materiLink,
+                        tugasLink = tugasLink
+                    ))
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
         
-        return courses
+        // Sort by day order
+        val dayOrder = mapOf(
+            "Senin" to 1, "Selasa" to 2, "Rabu" to 3,
+            "Kamis" to 4, "Jumat" to 5, "Sabtu" to 6, "Minggu" to 7
+        )
+        return courses.sortedBy { dayOrder[it.day] ?: 99 }
+    }
+    
+    /**
+     * Extract course info dari card body with multiple fallback strategies
+     */
+    private fun extractCourseInfo(cardBody: org.jsoup.select.Elements, label: String): String {
+        // Strategy 1: Try .styled:contains("label")
+        val styledElement = cardBody.select(".styled:contains($label)")
+        if (styledElement.isNotEmpty()) {
+            val text = styledElement.text()
+            val match = """$label\s*:\s*(.+)""".toRegex(RegexOption.IGNORE_CASE).find(text)
+            if (match != null) {
+                return match.groupValues[1].trim()
+            }
+        }
+        
+        // Strategy 2: Try finding in all text content
+        val allText = cardBody.text()
+        val pattern = """$label\s*:\s*([^\s]+)""".toRegex(RegexOption.IGNORE_CASE)
+        val match = pattern.find(allText)
+        if (match != null) {
+            return match.groupValues[1].trim()
+        }
+        
+        // Strategy 3: Try finding in individual elements
+        cardBody.select("*").forEach { element ->
+            val text = element.ownText().trim()
+            if (text.contains(label, ignoreCase = true)) {
+                val valueMatch = """$label\s*:\s*(.+)""".toRegex(RegexOption.IGNORE_CASE).find(text)
+                if (valueMatch != null) {
+                    return valueMatch.groupValues[1].trim()
+                }
+            }
+        }
+        
+        return ""
     }
     
     // ========== ATTENDANCE ==========
@@ -199,95 +286,195 @@ object HtmlParser {
     
     /**
      * Parse attendance records dari DataTables JSON response
+     * Handles both array format and object format responses
      */
     fun parseAttendanceRecords(json: String): List<AttendanceRecord> {
+        val records = mutableListOf<AttendanceRecord>()
         try {
-            val response = com.google.gson.Gson().fromJson(json, DataTablesResponse::class.java)
-            return response.data.mapIndexed { index, row ->
-                AttendanceRecord(
-                    no = (row.getOrNull(0) as? Double)?.toInt() ?: (index + 1),
-                    status = row.getOrNull(1)?.toString() ?: "",
-                    date = row.getOrNull(2)?.toString() ?: "",
-                    subject = row.getOrNull(3)?.toString() ?: "",
-                    pertemuan = (row.getOrNull(4) as? Double)?.toInt()?.toString() 
-                        ?: row.getOrNull(4)?.toString() ?: "",
-                    beritaAcara = row.getOrNull(5)?.toString() ?: "",
-                    rangkuman = row.getOrNull(6)?.toString() ?: ""
-                )
+            val gson = com.google.gson.Gson()
+            val jsonObject = gson.fromJson(json, com.google.gson.JsonObject::class.java)
+            val dataArray = jsonObject.getAsJsonArray("data") ?: return records
+            
+            dataArray.forEachIndexed { index, element ->
+                try {
+                    if (element.isJsonArray) {
+                        // Array format: [nomer, status, date, subject, pertemuan, beritaAcara, rangkuman]
+                        val arr = element.asJsonArray
+                        records.add(
+                            AttendanceRecord(
+                                no = arr.getOrNull(0)?.asInt ?: (index + 1),
+                                status = arr.getOrNull(1)?.asString ?: "",
+                                date = arr.getOrNull(2)?.asString ?: "",
+                                subject = arr.getOrNull(3)?.asString ?: "",
+                                pertemuan = arr.getOrNull(4)?.asString ?: "",
+                                beritaAcara = arr.getOrNull(5)?.asString ?: "",
+                                rangkuman = arr.getOrNull(6)?.asString ?: ""
+                            )
+                        )
+                    } else if (element.isJsonObject) {
+                        // Object format with named keys
+                        val item = element.asJsonObject
+                        records.add(
+                            AttendanceRecord(
+                                no = item.get("nomer")?.asInt 
+                                    ?: item.get("0")?.asInt 
+                                    ?: (index + 1),
+                                status = item.get("status_hadir")?.asString 
+                                    ?: item.get("1")?.asString 
+                                    ?: "",
+                                date = item.get("tgl_ajar_masuk")?.asString 
+                                    ?: item.get("2")?.asString 
+                                    ?: "",
+                                subject = item.get("nm_mtk")?.asString 
+                                    ?: item.get("3")?.asString 
+                                    ?: "",
+                                pertemuan = item.get("pertemuan")?.asString 
+                                    ?: item.get("4")?.asString 
+                                    ?: "",
+                                beritaAcara = item.get("berita_acara")?.asString 
+                                    ?: item.get("5")?.asString 
+                                    ?: "",
+                                rangkuman = item.get("rangkuman")?.asString 
+                                    ?: item.get("6")?.asString 
+                                    ?: ""
+                            )
+                        )
+                    }
+                } catch (e: Exception) {
+                    // Skip invalid record
+                }
             }
         } catch (e: Exception) {
             e.printStackTrace()
-            return emptyList()
         }
+        return records
     }
+    
+    // Extension function for JsonArray safe access
+    private fun com.google.gson.JsonArray.getOrNull(index: Int): com.google.gson.JsonElement? {
+        return if (index in 0 until size()) get(index) else null
+    }
+    
+    private val com.google.gson.JsonElement.asInt: Int
+        get() = try {
+            if (isJsonPrimitive) asJsonPrimitive.asInt else 0
+        } catch (e: Exception) { 0 }
+    
+    private val com.google.gson.JsonElement.asString: String
+        get() = try {
+            when {
+                isJsonPrimitive -> asJsonPrimitive.asString
+                isJsonNull -> ""
+                else -> toString()
+            }
+        } catch (e: Exception) { "" }
     
     // ========== ASSIGNMENTS ==========
     
     /**
      * Parse assignments dari halaman tugas
+     * Matches reference implementation from MyBestUBSI
      */
     fun parseAssignments(html: String): List<ParsedAssignment> {
         val doc = Jsoup.parse(html)
         val assignments = mutableListOf<ParsedAssignment>()
         
-        // Find assignment table (first table usually is "Data Penugasan")
-        val tables = doc.select("table")
-        val assignmentTable = tables.firstOrNull() ?: return assignments
-        
-        assignmentTable.select("tbody tr").forEach { row ->
-            try {
-                val cells = row.select("td")
-                if (cells.size >= 10) {
-                    val no = cells[0].text().toIntOrNull() ?: 0
-                    val kodeMtk = cells[1].text()
-                    val kelas = cells[2].text()
-                    val judul = cells[3].text()
-                    val deskripsi = cells[4].text()
-                    val pertemuan = cells[5].text()
-                    val mulai = cells[6].text()
-                    val selesai = cells[7].text()
-                    val created = cells[8].text()
-                    
-                    // Parse action cell for download and submit links
-                    val actionCell = cells[9]
-                    
-                    // Download form
-                    val downloadForm = actionCell.select("form[action*=download-file-tugas]")
-                    var downloadLink = ""
-                    if (downloadForm.isNotEmpty()) {
-                        val token = downloadForm.select("input[name=_token]").attr("value")
-                        val id = downloadForm.select("input[name=id]").attr("value")
-                        val file = downloadForm.select("input[name=file]").attr("value")
-                        downloadLink = "FORM:$token|$id|$file"
+        // Find assignment table by checking header text
+        doc.select("table").forEach { table ->
+            val headerText = table.select("thead th").text().lowercase()
+            
+            // Assignment table has "judul" and "mulai" in header
+            if (headerText.contains("judul") && headerText.contains("mulai")) {
+                table.select("tbody tr").forEachIndexed { index, row ->
+                    try {
+                        val cols = row.select("td")
+                        // Reference uses >= 8 columns
+                        if (cols.size >= 8) {
+                            val actionCol = cols.last()
+                            
+                            // Extract kerjakan/submit link
+                            val linkKerjakan = actionCol?.select("a[href*=/assignment/send/]")?.attr("href") ?: ""
+                            
+                            // Extract download form data
+                            val unduhForm = actionCol?.select("form[action*=download-file-tugas]")?.first()
+                            val linkUnduh = if (unduhForm != null) {
+                                val token = unduhForm.select("input[name=_token]").attr("value")
+                                val id = unduhForm.select("input[name=id]").attr("value")
+                                val file = unduhForm.select("input[name=file]").attr("value")
+                                if (token.isNotEmpty() && id.isNotEmpty() && file.isNotEmpty()) {
+                                    "FORM:$token|$id|$file"
+                                } else ""
+                            } else ""
+                            
+                            // Extract pertemuan text
+                            val pertemuanText = cols.getOrNull(5)?.select("center")?.text()?.trim()
+                                ?: cols.getOrNull(5)?.text()?.trim() ?: ""
+                            
+                            // Extract submitted link
+                            val submittedLink = actionCol?.select("a[href*=drive.google], a[href*=docs.google], a[target=_blank]")
+                                ?.firstOrNull()?.attr("href") ?: ""
+                            
+                            assignments.add(ParsedAssignment(
+                                no = cols.getOrNull(0)?.text()?.toIntOrNull() ?: (index + 1),
+                                kodeMtk = cols.getOrNull(1)?.text() ?: "",
+                                kelas = cols.getOrNull(2)?.text() ?: "",
+                                judul = cols.getOrNull(3)?.text() ?: "",
+                                deskripsi = cols.getOrNull(4)?.text() ?: "",
+                                pertemuan = pertemuanText,
+                                mulai = cols.getOrNull(6)?.text() ?: "",
+                                selesai = cols.getOrNull(7)?.text() ?: "",
+                                created = cols.getOrNull(8)?.text() ?: "",
+                                downloadLink = linkUnduh,
+                                submitLink = linkKerjakan,
+                                submittedLink = submittedLink
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        // Skip invalid row
                     }
-                    
-                    // Submit link
-                    val submitLink = actionCell.select("a[href*=assignment/send]").attr("href")
-                    
-                    // Already submitted link
-                    val submittedLink = actionCell.select("a[href*=drive.google], a[target=_blank]").attr("href")
-                    
-                    assignments.add(ParsedAssignment(
-                        no = no,
-                        kodeMtk = kodeMtk,
-                        kelas = kelas,
-                        judul = judul,
-                        deskripsi = deskripsi,
-                        pertemuan = pertemuan,
-                        mulai = mulai,
-                        selesai = selesai,
-                        created = created,
-                        downloadLink = downloadLink,
-                        submitLink = submitLink,
-                        submittedLink = submittedLink
-                    ))
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
         }
         
         return assignments
+    }
+    
+    /**
+     * Parse assignment grades dari halaman tugas
+     * Looks for table with "nilai" and "komentar" in header
+     */
+    fun parseAssignmentGrades(html: String): List<ParsedAssignmentGrade> {
+        val doc = Jsoup.parse(html)
+        val grades = mutableListOf<ParsedAssignmentGrade>()
+        
+        doc.select("table").forEach { table ->
+            val headerText = table.select("thead th").text().lowercase()
+            
+            // Grades table has "nilai" and "komentar" in header
+            if (headerText.contains("nilai") && headerText.contains("komentar")) {
+                table.select("tbody tr").forEachIndexed { index, row ->
+                    try {
+                        val cols = row.select("td")
+                        if (cols.size >= 6) {
+                            grades.add(ParsedAssignmentGrade(
+                                no = cols.getOrNull(0)?.text()?.toIntOrNull() ?: (index + 1),
+                                kodeMtk = cols.getOrNull(1)?.text() ?: "",
+                                judul = cols.getOrNull(2)?.text() ?: "",
+                                linkTugas = cols.getOrNull(3)?.text() ?: "",
+                                komentarDosen = cols.getOrNull(4)?.text() ?: "",
+                                nilai = cols.getOrNull(5)?.text() ?: "0",
+                                created = cols.getOrNull(6)?.text() ?: "",
+                                updated = cols.getOrNull(7)?.text() ?: ""
+                            ))
+                        }
+                    } catch (e: Exception) {
+                        // Skip invalid row
+                    }
+                }
+            }
+        }
+        
+        return grades
     }
     
     /**
@@ -398,4 +585,15 @@ data class AssignmentFormData(
 data class ParsedProfile(
     val name: String,
     val email: String
+)
+
+data class ParsedAssignmentGrade(
+    val no: Int,
+    val kodeMtk: String,
+    val judul: String,
+    val linkTugas: String,
+    val komentarDosen: String,
+    val nilai: String,
+    val created: String,
+    val updated: String
 )

@@ -30,7 +30,6 @@ class LoginActivity : AppCompatActivity() {
         
         setupViews()
         loadSavedCredentials()
-        checkAutoLogin()
     }
 
     private fun setupViews() {
@@ -51,60 +50,6 @@ class LoginActivity : AppCompatActivity() {
             binding.etNim.setText(prefManager.savedNim)
             binding.etPassword.setText(prefManager.savedPassword)
             binding.cbRemember.isChecked = true
-        }
-    }
-
-    private fun checkAutoLogin() {
-        // Check if auto-login is enabled and credentials exist
-        if (prefManager.autoLoginEnabled && 
-            prefManager.savedNim.isNotEmpty() && 
-            prefManager.savedPassword.isNotEmpty()) {
-            
-            // Show toast and start auto-login
-            Toast.makeText(this, getString(R.string.auto_login_wait), Toast.LENGTH_SHORT).show()
-            performAutoLogin()
-        }
-    }
-
-    private fun performAutoLogin() {
-        // Update button to show processing state
-        showLoading(true)
-        binding.btnLogin.text = getString(R.string.processing_login)
-        
-        // Disable all inputs during auto-login
-        setInputsEnabled(false)
-        
-        val nim = prefManager.savedNim
-        val password = prefManager.savedPassword
-        
-        lifecycleScope.launch {
-            val result = repository.performLogin(nim, password)
-            
-            result.onSuccess {
-                prefManager.isLoggedIn = true
-                prefManager.userName = nim
-                
-                // Sync schedule in background
-                repository.syncScheduleFromServer()
-                
-                Toast.makeText(
-                    this@LoginActivity, 
-                    getString(R.string.login_success_welcome, nim), 
-                    Toast.LENGTH_SHORT
-                ).show()
-                
-                navigateToMain()
-            }.onFailure { error ->
-                showLoading(false)
-                setInputsEnabled(true)
-                binding.btnLogin.text = getString(R.string.login_button)
-                
-                Snackbar.make(
-                    binding.root,
-                    error.message ?: "Login gagal",
-                    Snackbar.LENGTH_LONG
-                ).show()
-            }
         }
     }
 
@@ -132,6 +77,7 @@ class LoginActivity : AppCompatActivity() {
         setInputsEnabled(false)
         
         lifecycleScope.launch {
+            // Always fetch fresh captcha - captcha auto-regenerates so caching doesn't work
             val result = repository.performLogin(nim, password)
             
             result.onSuccess {

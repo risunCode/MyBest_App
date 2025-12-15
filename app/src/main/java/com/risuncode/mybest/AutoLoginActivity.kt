@@ -78,6 +78,7 @@ class AutoLoginActivity : AppCompatActivity() {
         }
 
         prefManager.rememberMe = binding.switchAutoLogin.isChecked
+        prefManager.autoLoginEnabled = binding.switchAutoLogin.isChecked // Sync both
         prefManager.savedNim = nim
         prefManager.savedPassword = password
 
@@ -97,6 +98,7 @@ class AutoLoginActivity : AppCompatActivity() {
 
     private fun clearSavedData() {
         prefManager.rememberMe = false
+        prefManager.autoLoginEnabled = false
         prefManager.savedNim = ""
         prefManager.savedPassword = ""
         

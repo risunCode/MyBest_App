@@ -42,6 +42,7 @@
     <string name="upcoming_class">KULIAH MENDATANG</string>
     <string name="starts_in">Mulai dalam %s</string>
     <string name="today_schedule">Jadwal Hari Ini</string>
+    <string name="all_schedule">Semua Jadwal</string>
     <string name="tips_today">Tips Hari Ini</string>
     <string name="tip_no_class_today">Tidak ada kuliah hari ini. Waktu yang tepat untuk belajar mandiri!</string>
     <string name="tip_class_count">Kamu memiliki %1$d kelas hari ini. Semangat belajar!</string>
@@ -126,9 +127,12 @@
     <string name="error_password_mismatch">Password baru tidak cocok</string>
     <string name="error_password_min_length">Password minimal 6 karakter</string>
     <string name="error_nim_password_empty">NIM dan Password tidak boleh kosong</string>
+    <string name="error_name_empty">Nama tidak boleh kosong</string>
+    <string name="error_email_invalid">Email tidak valid</string>
     
     <!-- Success Messages -->
     <string name="password_changed_success">Password berhasil diubah</string>
+    <string name="profile_updated_success">Profil berhasil diperbarui</string>
     <string name="auto_login_saved">Data auto login berhasil disimpan</string>
     <string name="data_cleared">Data berhasil dihapus</string>
     <string name="settings_saved">Pengaturan berhasil disimpan</string>
@@ -158,6 +162,7 @@
     <string name="contact_admin_reset">Hubungi admin kampus untuk reset password</string>
     <string name="share_via">Bagikan via</string>
     <string name="session_expired_reload">Sesi berakhir (memuat ulang sesi, tunggu sebentar)</string>
+    <string name="session_expired">Sesi berakhir, silakan login kembali</string>
     
     <!-- Presensi -->
     <string name="presensi_title">Presensi</string>
@@ -193,6 +198,7 @@
     <string name="tugas_summary">Total: %1$d tugas • Aktif: %2$d • Berakhir: %3$d</string>
     <string name="pertemuan_n">Pertemuan %1$d</string>
     <string name="deadline_format">Deadline: %1$s</string>
+    <string name="komentar_dosen">Komentar Dosen:</string>
     <string name="aktif">Aktif</string>
     <string name="berakhir">Berakhir</string>
     <string name="lihat">LIHAT</string>

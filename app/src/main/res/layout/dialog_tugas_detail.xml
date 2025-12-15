@@ -5,7 +5,8 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:padding="20dp">
+    android:background="@drawable/bg_dialog_rounded"
+    android:padding="16dp">
 
     <!-- Header: Pertemuan -->
     <TextView
@@ -13,7 +14,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:textColor="@color/primary"
-        android:textSize="14sp"
+        android:textSize="12sp"
         android:textStyle="bold"
         tools:text="Pertemuan 1" />
 
@@ -22,9 +23,9 @@
         android:id="@+id/tvTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_marginTop="2dp"
         android:textColor="@color/text_primary"
-        android:textSize="18sp"
+        android:textSize="16sp"
         android:textStyle="bold"
         tools:text="hasil quis pertemuan 1" />
 
@@ -32,13 +33,13 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:layout_marginTop="6dp"
         android:gravity="center_vertical"
         android:orientation="horizontal">
 
         <ImageView
-            android:layout_width="16dp"
-            android:layout_height="16dp"
+            android:layout_width="14dp"
+            android:layout_height="14dp"
             android:src="@drawable/ic_clock"
             app:tint="@color/text_secondary" />
 
@@ -46,10 +47,10 @@
             android:id="@+id/tvDeadline"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="6dp"
+            android:layout_marginStart="4dp"
             android:layout_weight="1"
             android:textColor="@color/text_secondary"
-            android:textSize="13sp"
+            android:textSize="12sp"
             tools:text="Deadline: 22 Sep 2025, 11:00" />
 
         <TextView
@@ -58,10 +59,10 @@
             android:layout_height="wrap_content"
             android:background="@drawable/bg_status_badge"
             android:backgroundTint="@color/text_secondary"
-            android:paddingHorizontal="12dp"
-            android:paddingVertical="4dp"
+            android:paddingHorizontal="10dp"
+            android:paddingVertical="3dp"
             android:textColor="@color/text_white"
-            android:textSize="11sp"
+            android:textSize="10sp"
             android:textStyle="bold"
             tools:text="Berakhir" />
     </LinearLayout>
@@ -69,21 +70,21 @@
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginVertical="16dp"
+        android:layout_marginVertical="10dp"
         android:background="@color/divider" />
 
     <!-- File Card -->
     <androidx.cardview.widget.CardView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        app:cardCornerRadius="8dp"
-        app:cardElevation="1dp">
+        app:cardCornerRadius="6dp"
+        app:cardElevation="0.5dp">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="12dp">
+            android:padding="10dp">
 
             <!-- File Info Row -->
             <LinearLayout
@@ -92,17 +93,31 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
-                <ImageView
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_pdf"
-                    app:tint="@color/primary" />
+                <FrameLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content">
+
+                    <ImageView
+                        android:layout_width="32dp"
+                        android:layout_height="32dp"
+                        android:padding="6dp"
+                        android:src="@drawable/ic_pdf"
+                        app:tint="@color/primary" />
+
+                    <ImageView
+                        android:id="@+id/ivCheckBadge"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:layout_gravity="bottom|end"
+                        android:src="@drawable/ic_check_circle"
+                        android:visibility="gone"
+                        app:tint="@color/status_success" />
+                </FrameLayout>
 
                 <LinearLayout
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="8dp"
+                    android:layout_marginStart="6dp"
                     android:layout_weight="1"
                     android:orientation="vertical">
 
@@ -113,7 +128,7 @@
                         android:ellipsize="middle"
                         android:maxLines="1"
                         android:textColor="@color/text_primary"
-                        android:textSize="13sp"
+                        android:textSize="12sp"
                         tools:text="aeXWMzkj455HKXOAN7...D2K1nCYkfK0VnYiqa.pdf" />
 
                     <TextView
@@ -122,40 +137,25 @@
                         android:layout_height="wrap_content"
                         android:text="@string/not_downloaded"
                         android:textColor="@color/text_secondary"
-                        android:textSize="12sp" />
+                        android:textSize="11sp" />
                 </LinearLayout>
             </LinearLayout>
 
-            <!-- Action Buttons -->
-            <LinearLayout
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnUnduh"
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:orientation="horizontal">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnLihat"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_marginEnd="8dp"
-                    android:layout_weight="1"
-                    android:text="@string/lihat"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_visibility"
-                    app:iconGravity="textStart"
-                    app:strokeColor="@color/primary" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnUnduh"
-                    android:layout_width="0dp"
-                    android:layout_height="40dp"
-                    android:layout_weight="1"
-                    android:text="@string/unduh"
-                    android:textSize="12sp"
-                    app:icon="@drawable/ic_download"
-                    app:iconGravity="textStart" />
-            </LinearLayout>
+                android:layout_height="42dp"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:insetTop="0dp"
+                android:insetBottom="0dp"
+                android:text="@string/unduh"
+                android:textSize="11sp"
+                app:cornerRadius="6dp"
+                app:icon="@drawable/ic_download"
+                app:iconGravity="textStart"
+                app:iconPadding="6dp"
+                app:iconSize="18dp" />
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
@@ -163,7 +163,7 @@
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="12dp"
         android:hint="@string/link_google_drive"
         style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
 
@@ -172,20 +172,21 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:inputType="textUri"
+            android:textSize="12sp"
             tools:text="https://drive.google.com/..." />
     </com.google.android.material.textfield.TextInputLayout>
 
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="12dp"
         android:background="@color/divider" />
 
     <!-- Bottom Buttons -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
+        android:layout_marginTop="10dp"
         android:gravity="end"
         android:orientation="horizontal">
 
@@ -195,12 +196,14 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="@string/cancel"
+            android:textSize="12sp"
             android:textColor="@color/text_secondary" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnKirim"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:textSize="12sp"
             android:text="@string/kirim_tugas"
             app:icon="@drawable/ic_send" />
     </LinearLayout>

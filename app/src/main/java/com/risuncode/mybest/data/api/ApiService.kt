@@ -25,16 +25,24 @@ class ApiService {
             val html = getPageHtmlWithFallback("/login")
                 ?: return@withContext Result.failure(IOException("Tidak dapat terhubung ke server BSI"))
             
+            // Check if we're already logged in (redirected to dashboard)
+            if (!HtmlParser.isLoginPage(html)) {
+                return@withContext Result.failure(AlreadyLoggedException())
+            }
+            
             val csrfToken = HtmlParser.extractCsrfToken(html)
                 ?: return@withContext Result.failure(IOException("CSRF token not found"))
             
             val captchaQuestion = HtmlParser.extractCaptchaQuestion(html)
                 ?: return@withContext Result.failure(IOException("Captcha not found"))
             
+            val captchaAnswer = HtmlParser.solveCaptcha(captchaQuestion)
+                ?: return@withContext Result.failure(IOException("Cannot solve captcha: $captchaQuestion"))
+            
             Result.success(LoginPageData(
                 csrfToken = csrfToken,
                 captchaQuestion = captchaQuestion,
-                captchaAnswer = HtmlParser.solveCaptcha(captchaQuestion)
+                captchaAnswer = captchaAnswer
             ))
         } catch (e: Exception) {
             Result.failure(e)
@@ -278,10 +286,18 @@ class ApiService {
     
     /**
      * Get assignments for a course
+     * @param tugasLink The tugas link from schedule (e.g., "/tugas/xxx")
      */
-    suspend fun getAssignments(encryptedCourseId: String): Result<List<ParsedAssignment>> = withContext(Dispatchers.IO) {
+    suspend fun getAssignments(tugasLink: String): Result<List<ParsedAssignment>> = withContext(Dispatchers.IO) {
         try {
-            val html = getPageHtml("/tugas/$encryptedCourseId")
+            // Handle both full URLs and relative paths
+            val url = when {
+                tugasLink.startsWith("http") -> tugasLink // Already full URL
+                tugasLink.startsWith("/") -> "${ApiClient.BASE_URL}$tugasLink"
+                else -> "${ApiClient.BASE_URL}/$tugasLink"
+            }
+            
+            val html = getFullUrlHtml(url)
                 ?: return@withContext Result.failure(IOException("Failed to get assignments"))
             
             if (HtmlParser.isLoginPage(html)) {
@@ -290,6 +306,33 @@ class ApiService {
             
             val assignments = HtmlParser.parseAssignments(html)
             Result.success(assignments)
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Get assignment grades for a course
+     * @param tugasLink The tugas link from schedule (e.g., "/tugas/xxx")
+     */
+    suspend fun getAssignmentGrades(tugasLink: String): Result<List<ParsedAssignmentGrade>> = withContext(Dispatchers.IO) {
+        try {
+            // Handle both full URLs and relative paths
+            val url = when {
+                tugasLink.startsWith("http") -> tugasLink // Already full URL
+                tugasLink.startsWith("/") -> "${ApiClient.BASE_URL}$tugasLink"
+                else -> "${ApiClient.BASE_URL}/$tugasLink"
+            }
+            
+            val html = getFullUrlHtml(url)
+                ?: return@withContext Result.failure(IOException("Failed to get assignment grades"))
+            
+            if (HtmlParser.isLoginPage(html)) {
+                return@withContext Result.failure(SessionExpiredException())
+            }
+            
+            val grades = HtmlParser.parseAssignmentGrades(html)
+            Result.success(grades)
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -548,6 +591,42 @@ class ApiService {
             null
         }
     }
+    
+    /**
+     * Get page HTML from a FULL URL (doesn't prepend BASE_URL)
+     * Used for URLs that are already complete (e.g., from schedule links)
+     */
+    private fun getFullUrlHtml(fullUrl: String): String? {
+        return try {
+            val request = Request.Builder()
+                .url(fullUrl)
+                .get()
+                .build()
+            
+            val response = client.newCall(request).execute()
+            
+            // Handle redirects
+            if (response.code == 302) {
+                val location = response.header("Location")
+                response.close()
+                if (location == null) return null
+                // Redirect might be relative or full
+                return if (location.startsWith("http")) {
+                    getFullUrlHtml(location)
+                } else {
+                    getPageHtml(location)
+                }
+            }
+            
+            val content = response.body?.string()
+            response.close()
+            content
+        } catch (e: javax.net.ssl.SSLHandshakeException) {
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
 }
 
 // ========== DATA CLASSES ==========
@@ -570,3 +649,5 @@ data class AttendanceResult(
 )
 
 class SessionExpiredException : IOException("Session expired - silakan login ulang")
+
+class AlreadyLoggedException : IOException("Sudah login - silakan refresh halaman")

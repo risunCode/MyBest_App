@@ -22,6 +22,7 @@ import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.ActivityPresensiBinding
 import com.risuncode.mybest.ui.login.LoginActivity
 import com.risuncode.mybest.ui.tugas.TugasActivity
+import com.risuncode.mybest.util.DateUtils
 import com.risuncode.mybest.util.PreferenceManager
 import kotlinx.coroutines.launch
 
@@ -67,7 +68,8 @@ class PresensiActivity : AppCompatActivity() {
     private fun setupListeners() {
         binding.btnTugas.setOnClickListener {
             schedule?.let { s ->
-                TugasActivity.start(this, s.id, s.subjectName, s.encryptedId)
+                // Use tugasLink which contains the actual path (e.g., "/tugas/xxx")
+                TugasActivity.start(this, s.id, s.subjectName, s.tugasLink)
             }
         }
 
@@ -102,37 +104,35 @@ class PresensiActivity : AppCompatActivity() {
                     binding.btnPresensi.isEnabled = false
                 }
 
-                // Load attendance records from API or local
-                loadAttendanceRecords(s.encryptedId)
+                // Load attendance records (uses cache if available)
+                loadAttendanceRecords(s.encryptedId, forceRefresh = false)
             }
         }
     }
 
     private fun isScheduleToday(scheduleDay: String): Boolean {
-        val today = getCurrentDayInIndonesian()
+        val today = DateUtils.getCurrentDayInIndonesian()
         return scheduleDay.equals(today, ignoreCase = true)
     }
 
-    private fun getCurrentDayInIndonesian(): String {
-        val calendar = java.util.Calendar.getInstance()
-        return when (calendar.get(java.util.Calendar.DAY_OF_WEEK)) {
-            java.util.Calendar.MONDAY -> "Senin"
-            java.util.Calendar.TUESDAY -> "Selasa"
-            java.util.Calendar.WEDNESDAY -> "Rabu"
-            java.util.Calendar.THURSDAY -> "Kamis"
-            java.util.Calendar.FRIDAY -> "Jumat"
-            java.util.Calendar.SATURDAY -> "Sabtu"
-            java.util.Calendar.SUNDAY -> "Minggu"
-            else -> "Senin"
-        }
-    }
+
 
     private var hadirCount = 0
     private var tidakHadirCount = 0
+    
+    // Cache attendance records to avoid repeated API calls
+    private var cachedAttendanceRecords: List<AttendanceRecord>? = null
+    private var cachedEncryptedId: String = ""
 
-    private fun loadAttendanceRecords(encryptedId: String) {
+    private fun loadAttendanceRecords(encryptedId: String, forceRefresh: Boolean = false) {
         if (encryptedId.isEmpty()) {
             showEmptyAttendanceState("Data tidak tersedia")
+            return
+        }
+        
+        // Use cache if available and same course
+        if (!forceRefresh && cachedAttendanceRecords != null && cachedEncryptedId == encryptedId) {
+            populateAttendanceList(cachedAttendanceRecords!!)
             return
         }
         
@@ -140,6 +140,10 @@ class PresensiActivity : AppCompatActivity() {
             val result = repository.getAttendanceRecords(encryptedId)
             
             result.onSuccess { records ->
+                // Save to cache
+                cachedAttendanceRecords = records
+                cachedEncryptedId = encryptedId
+                
                 if (records.isNotEmpty()) {
                     populateAttendanceList(records)
                 } else {
@@ -164,8 +168,10 @@ class PresensiActivity : AppCompatActivity() {
         val container = binding.attendanceListContainer
         container.removeAllViews()
         
-        hadirCount = records.count { it.status.contains("Hadir", ignoreCase = true) }
-        tidakHadirCount = records.count { !it.status.contains("Hadir", ignoreCase = true) }
+        // Fix: Check for "TIDAK" to correctly identify absence
+        // "TIDAK HADIR" contains "TIDAK", while "HADIR" does not
+        hadirCount = records.count { !it.status.contains("TIDAK", ignoreCase = true) && it.status.contains("HADIR", ignoreCase = true) }
+        tidakHadirCount = records.count { it.status.contains("TIDAK", ignoreCase = true) }
         
         for (record in records) {
             val itemView = LayoutInflater.from(this)
@@ -188,7 +194,8 @@ class PresensiActivity : AppCompatActivity() {
             tvBeritaAcara.text = record.beritaAcara.ifEmpty { "Tidak ada berita acara" }
 
             // Set status badge
-            val isHadir = record.status.contains("Hadir", ignoreCase = true)
+            // Fix: Check for "TIDAK" to correctly identify absence
+            val isHadir = !record.status.contains("TIDAK", ignoreCase = true) && record.status.contains("HADIR", ignoreCase = true)
             if (isHadir) {
                 tvStatus.text = getString(R.string.status_hadir)
                 tvStatus.backgroundTintList = android.content.res.ColorStateList.valueOf(
@@ -311,17 +318,45 @@ class PresensiActivity : AppCompatActivity() {
         
         Toast.makeText(
             this,
-            getString(R.string.session_expired_reload),
-            Toast.LENGTH_LONG
+            "Sesi berakhir. Mencoba login ulang...",
+            Toast.LENGTH_SHORT
         ).show()
         
         lifecycleScope.launch {
-            kotlinx.coroutines.delay(2000)
-            val intent = Intent(this@PresensiActivity, LoginActivity::class.java)
-            intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            startActivity(intent)
-            finish()
+            // Try auto-relogin
+            val nim = prefManager.savedNim
+            val password = prefManager.savedPassword
+            
+            if (nim.isNotEmpty() && password.isNotEmpty()) {
+                val loginResult = repository.performLogin(nim, password)
+                
+                loginResult.onSuccess {
+                    Toast.makeText(this@PresensiActivity, "Login ulang berhasil", Toast.LENGTH_SHORT).show()
+                    prefManager.isLoggedIn = true
+                    
+                    // Retry last action if needed, or just let user click again
+                    // For now, just restore UI state
+                    binding.btnPresensi.isEnabled = true
+                    binding.btnPresensi.text = getString(R.string.presensi_start)
+                    
+                    // Refresh data
+                    loadScheduleData()
+                }.onFailure {
+                    // Login failed, go to login screen
+                    Toast.makeText(this@PresensiActivity, getString(R.string.session_expired_reload), Toast.LENGTH_LONG).show()
+                    navigateToLogin()
+                }
+            } else {
+                navigateToLogin()
+            }
         }
+    }
+    
+    private fun navigateToLogin() {
+        val intent = Intent(this@PresensiActivity, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
     }
 
     private fun updateLastResponse(code: Int) {
@@ -343,12 +378,5 @@ class PresensiActivity : AppCompatActivity() {
             .show()
     }
 
-    private suspend fun AppRepository.getScheduleById(id: Int): ScheduleEntity? {
-        return try {
-            val database = AppDatabase.getDatabase(this@PresensiActivity)
-            database.scheduleDao().getScheduleById(id)
-        } catch (e: Exception) {
-            null
-        }
-    }
+
 }

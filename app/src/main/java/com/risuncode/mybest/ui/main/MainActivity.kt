@@ -11,6 +11,7 @@ import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.risuncode.mybest.R
 import com.risuncode.mybest.data.AppDatabase
+import com.risuncode.mybest.data.api.ApiClient
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.ActivityMainBinding
 import com.risuncode.mybest.ui.dashboard.DashboardFragment
@@ -36,9 +37,24 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
+        // Initialize global User Agent from WebView (before any API calls)
+        // Initialize global User Agent and Cookies
+        ApiClient.init(this)
+        
         prefManager = PreferenceManager(this)
         val database = AppDatabase.getDatabase(this)
         repository = AppRepository(database)
+        
+        // Check if user can be logged in (any credentials available)
+        val hasCredentials = prefManager.savedNim.isNotEmpty() && prefManager.savedPassword.isNotEmpty()
+        if (!prefManager.isLoggedIn && !prefManager.autoLoginEnabled && !hasCredentials) {
+            // No session and no credentials - go to login
+            redirectToLogin()
+            return
+        }
+        
+        // Check session validity in background
+        checkSessionAndRedirect()
         
         setupBackPressHandler()
         setupBottomNavigation()
@@ -50,6 +66,56 @@ class MainActivity : AppCompatActivity() {
             updateAppBarTitle(R.string.nav_dashboard)
             binding.navigationView.setCheckedItem(R.id.nav_drawer_dashboard)
         }
+    }
+    
+    /**
+     * Check if session is still valid.
+     * If expired, try auto-relogin. Only redirect to login if auto-relogin fails.
+     */
+    private fun checkSessionAndRedirect() {
+        lifecycleScope.launch {
+            val sessionValid = repository.checkSession()
+            
+            if (!sessionValid) {
+                // Session expired - try auto-relogin if we have credentials
+                val nim = prefManager.savedNim
+                val password = prefManager.savedPassword
+                
+                if (nim.isNotEmpty() && password.isNotEmpty()) {
+                    // Try auto-relogin silently
+                    val loginResult = repository.performLogin(nim, password)
+                    
+                    loginResult.onSuccess {
+                        // Auto-relogin succeeded - continue using app
+                        prefManager.isLoggedIn = true
+                        return@launch
+                    }.onFailure { error ->
+                        // Auto-relogin failed - show message and redirect
+                        Toast.makeText(
+                            this@MainActivity,
+                            "Sesi berakhir: ${error.message}",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        redirectToLogin()
+                    }
+                } else {
+                    // No saved credentials - redirect to login
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.session_expired),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    redirectToLogin()
+                }
+            }
+        }
+    }
+    
+    private fun redirectToLogin() {
+        startActivity(Intent(this@MainActivity, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
+        finish()
     }
     
     private fun setupBackPressHandler() {
@@ -168,23 +234,25 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun logout() {
-        // Clear all data properly
+        // Clear auth data immediately for instant response
+        prefManager.clearAuthData()
+        prefManager.isSetupCompleted = false
+        prefManager.autoLoginEnabled = false
+        prefManager.isLoggedIn = false
+        
+        // Navigate to login immediately (don't wait for network)
+        startActivity(Intent(this@MainActivity, LoginActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        })
+        finish()
+        
+        // Clear database and API session in background (fire and forget)
         lifecycleScope.launch {
-            // Clear database and API session
-            repository.performLogout()
-            
-            // Clear auth data from preferences
-            prefManager.clearAuthData()
-            prefManager.isSetupCompleted = false
-            
-            // Disable auto-login temporarily (but keep saved credentials for autofill)
-            prefManager.autoLoginEnabled = false
-            
-            // Navigate to login
-            startActivity(Intent(this@MainActivity, LoginActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-            })
-            finish()
+            try {
+                repository.performLogout()
+            } catch (e: Exception) {
+                // Ignore logout errors - user already navigated away
+            }
         }
     }
     

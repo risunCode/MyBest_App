@@ -95,4 +95,7 @@ dependencies {
     
     // HTML Parsing - Jsoup
     implementation("org.jsoup:jsoup:1.17.2")
+    
+    // PDF Viewer
+    implementation("com.github.mhiew:android-pdf-viewer:3.2.0-beta.3")
 }

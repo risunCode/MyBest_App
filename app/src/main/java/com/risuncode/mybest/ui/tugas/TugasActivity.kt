@@ -17,13 +17,13 @@ class TugasActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_SCHEDULE_ID = "schedule_id"
         const val EXTRA_SUBJECT_NAME = "subject_name"
-        const val EXTRA_ENCRYPTED_ID = "encrypted_id"
+        const val EXTRA_TUGAS_LINK = "tugas_link"
 
-        fun start(context: Context, scheduleId: Int, subjectName: String, encryptedId: String = "") {
+        fun start(context: Context, scheduleId: Int, subjectName: String, tugasLink: String = "") {
             val intent = Intent(context, TugasActivity::class.java).apply {
                 putExtra(EXTRA_SCHEDULE_ID, scheduleId)
                 putExtra(EXTRA_SUBJECT_NAME, subjectName)
-                putExtra(EXTRA_ENCRYPTED_ID, encryptedId)
+                putExtra(EXTRA_TUGAS_LINK, tugasLink)
             }
             context.startActivity(intent)
         }
@@ -35,10 +35,10 @@ class TugasActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         val subjectName = intent.getStringExtra(EXTRA_SUBJECT_NAME) ?: ""
-        val encryptedId = intent.getStringExtra(EXTRA_ENCRYPTED_ID) ?: ""
+        val tugasLink = intent.getStringExtra(EXTRA_TUGAS_LINK) ?: ""
 
         setupAppBar(subjectName)
-        setupTabs(encryptedId)
+        setupTabs(tugasLink)
     }
 
     private fun setupAppBar(subjectName: String) {
@@ -46,13 +46,13 @@ class TugasActivity : AppCompatActivity() {
         binding.tvSubjectName.text = subjectName
     }
 
-    private fun setupTabs(encryptedId: String) {
+    private fun setupTabs(tugasLink: String) {
         val tabTitles = listOf(
             getString(R.string.data_penugasan),
             getString(R.string.data_nilai_tugas)
         )
 
-        binding.viewPager.adapter = TugasPagerAdapter(this, tabTitles.size, encryptedId)
+        binding.viewPager.adapter = TugasPagerAdapter(this, tabTitles.size, tugasLink)
 
         TabLayoutMediator(binding.tabLayout, binding.viewPager) { tab, position ->
             tab.text = tabTitles[position]
@@ -62,18 +62,15 @@ class TugasActivity : AppCompatActivity() {
     private inner class TugasPagerAdapter(
         activity: AppCompatActivity,
         private val itemCount: Int,
-        private val encryptedId: String
+        private val tugasLink: String
     ) : FragmentStateAdapter(activity) {
 
         override fun getItemCount(): Int = itemCount
 
         override fun createFragment(position: Int): Fragment {
             return when (position) {
-                0 -> TugasListFragment.newInstance(encryptedId)
-                else -> TugasEmptyFragment.newInstance(
-                    getString(R.string.no_nilai),
-                    getString(R.string.no_nilai_desc)
-                )
+                0 -> TugasListFragment.newInstance(tugasLink)
+                else -> TugasNilaiFragment.newInstance(tugasLink)
             }
         }
     }

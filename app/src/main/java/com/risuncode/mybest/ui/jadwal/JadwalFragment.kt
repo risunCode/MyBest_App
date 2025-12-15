@@ -16,6 +16,8 @@ import com.risuncode.mybest.data.entity.ScheduleEntity
 import com.risuncode.mybest.data.repository.AppRepository
 import com.risuncode.mybest.databinding.FragmentJadwalBinding
 import com.risuncode.mybest.ui.presensi.PresensiActivity
+import com.risuncode.mybest.util.DateUtils
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.util.Calendar
@@ -57,18 +59,16 @@ class JadwalFragment : Fragment() {
     private fun refreshData() {
         viewLifecycleOwner.lifecycleScope.launch {
             // Try to sync from server
+            binding.swipeRefresh.isRefreshing = true
             val result = repository.syncScheduleFromServer()
             
-            result.onSuccess {
-                loadScheduleData()
-            }.onFailure { error ->
-                // Show error but still load local data
+            result.onFailure { error ->
+                // Show error
                 android.widget.Toast.makeText(
                     requireContext(),
                     error.message ?: "Gagal sinkronisasi",
                     android.widget.Toast.LENGTH_SHORT
                 ).show()
-                loadScheduleData()
             }
             
             binding.swipeRefresh.isRefreshing = false
@@ -89,29 +89,34 @@ class JadwalFragment : Fragment() {
     
     private fun loadScheduleData() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val allSchedules = repository.getAllSchedules().firstOrNull() ?: emptyList()
-            val totalSks = repository.getTotalSks()
-            
-            // Update stats
-            binding.tvTotalMatkul.text = allSchedules.size.toString()
-            binding.tvTotalSks.text = totalSks.toString()
-            
-            // Update upcoming class
-            val upcomingSchedule = allSchedules.firstOrNull()
-            upcomingSchedule?.let { schedule ->
-                binding.tvUpcomingName.text = schedule.subjectName
-                binding.tvUpcomingTime.text = "${schedule.day}, ${schedule.startTime} - ${schedule.endTime}"
-                binding.tvCountdown.text = calculateCountdown(schedule)
-            }
-            
-            // Populate schedule list
-            populateScheduleList(allSchedules)
-            
-            // Show/hide empty state
-            if (allSchedules.isEmpty()) {
-                binding.cardNoSchedule.visibility = View.VISIBLE
-            } else {
-                binding.cardNoSchedule.visibility = View.GONE
+            repository.getAllSchedules().collect { allSchedules ->
+                val totalSks = repository.getTotalSks()
+                
+                // Update stats
+                binding.tvTotalMatkul.text = allSchedules.size.toString()
+                binding.tvTotalSks.text = totalSks.toString()
+                
+                // Update upcoming class
+                val upcomingSchedule = allSchedules.firstOrNull()
+                if (upcomingSchedule != null) {
+                    binding.tvUpcomingName.text = upcomingSchedule.subjectName
+                    binding.tvUpcomingTime.text = "${upcomingSchedule.day}, ${upcomingSchedule.startTime} - ${upcomingSchedule.endTime}"
+                    binding.tvCountdown.text = calculateCountdown(upcomingSchedule)
+                } else {
+                    binding.tvUpcomingName.text = "-"
+                    binding.tvUpcomingTime.text = "-"
+                    binding.tvCountdown.text = "-"
+                }
+                
+                // Populate schedule list
+                populateScheduleList(allSchedules)
+                
+                // Show/hide empty state
+                if (allSchedules.isEmpty()) {
+                    binding.cardNoSchedule.visibility = View.VISIBLE
+                } else {
+                    binding.cardNoSchedule.visibility = View.GONE
+                }
             }
         }
     }
@@ -194,7 +199,7 @@ class JadwalFragment : Fragment() {
      * - Gray: Today but time has passed
      */
     private fun getScheduleColorRes(schedule: ScheduleEntity): Int {
-        val today = getCurrentDayInIndonesian()
+        val today = DateUtils.getCurrentDayInIndonesian()
         
         if (schedule.day != today) {
             return R.color.schedule_future
@@ -247,19 +252,7 @@ class JadwalFragment : Fragment() {
         super.onDestroyView()
         _binding = null
     }
-    
-    private fun getCurrentDayInIndonesian(): String {
-        val calendar = Calendar.getInstance()
-        return when (calendar.get(Calendar.DAY_OF_WEEK)) {
-            Calendar.MONDAY -> "Senin"
-            Calendar.TUESDAY -> "Selasa"
-            Calendar.WEDNESDAY -> "Rabu"
-            Calendar.THURSDAY -> "Kamis"
-            Calendar.FRIDAY -> "Jumat"
-            Calendar.SATURDAY -> "Sabtu"
-            Calendar.SUNDAY -> "Minggu"
-            else -> "Senin"
-        }
-    }
 }
+    
+
 

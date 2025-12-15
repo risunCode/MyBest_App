@@ -1,5 +1,7 @@
 package com.risuncode.mybest.data.api
 
+import android.content.Context
+import android.webkit.WebSettings
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import java.security.SecureRandom
@@ -22,6 +24,29 @@ object ApiClient {
     // Default pakai HTTPS dulu
     var BASE_URL = BASE_URL_HTTPS
         private set
+    
+    // Fallback User Agent (Chrome on Android)
+    private const val FALLBACK_USER_AGENT = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+    
+    // Global User Agent - set from WebView on first run
+    var userAgent: String = FALLBACK_USER_AGENT
+        private set
+    
+    /**
+     * Initialize ApiClient (Cookie Persistence & User Agent)
+     * Call this once on app start (in Application class)
+     */
+    fun init(context: Context) {
+        // Init Cookies
+        cookieJar.init(context)
+        
+        // Init User Agent
+        try {
+            userAgent = WebSettings.getDefaultUserAgent(context)
+        } catch (e: Exception) {
+            userAgent = FALLBACK_USER_AGENT
+        }
+    }
     
     // Cookie jar untuk session management
     val cookieJar = SessionCookieJar()
@@ -55,7 +80,7 @@ object ApiClient {
             .followRedirects(false) // Handle redirects manually untuk detect login redirect
             .addInterceptor { chain ->
                 val request = chain.request().newBuilder()
-                    .addHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
+                    .addHeader("User-Agent", userAgent)
                     .addHeader("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
                     .addHeader("Accept-Language", "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7")
                     .build()
